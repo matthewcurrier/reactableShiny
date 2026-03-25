@@ -1,5 +1,14 @@
+docs
 .Rproj.user
 .Rhistory
 .RData
+.Renviron
 .Ruserdata
-docs
+*.o
+*.so
+*.dll
+src/*.o
+src/*.so
+inst/testapp
+inst/docs
+inst/scripts
