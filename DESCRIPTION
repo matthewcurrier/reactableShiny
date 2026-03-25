@@ -29,5 +29,5 @@ Suggests:
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Config/Needs/website: rmarkdown
-URL: https://github.com/matthewcurrier/reactable.shiny
+URL: https://github.com/matthewcurrier/reactable.shiny, https://matthewcurrier.github.io/reactable.shiny/
 BugReports: https://github.com/matthewcurrier/reactable.shiny/issues
