@@ -4,14 +4,14 @@ Title: Extends reactable tables for use with shiny (ie uploading data)
 Version: 0.1.0
 Authors@R: c(
     person(
-      "Jane", "Doe",
-      email = "jane@example.com",
+      "Matthew", "Currier",
+      email = "currier.matthew@gmail.com",
       role = c("aut", "cre")
     )
   )
-Description: More about what it does (maybe more than one line).
-    Continuation lines should be indented.
-License: What license is it under?
+Description: Shiny modules for different use cases where app
+    needs to upload data to database. 
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Imports: 
