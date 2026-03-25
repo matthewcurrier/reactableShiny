@@ -1,6 +1,6 @@
 Package: reactable.shiny
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Extends reactable tables for use with shiny (ie uploading data)
 Version: 0.1.0
 Authors@R: c(
     person(
@@ -22,3 +22,10 @@ Imports:
     shiny,
     shinyjs
 RoxygenNote: 7.3.3
+Suggests: 
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Config/testthat/edition: 3
+VignetteBuilder: knitr
+Config/Needs/website: rmarkdown

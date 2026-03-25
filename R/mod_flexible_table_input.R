@@ -148,6 +148,10 @@ flexible_table_server <- function(
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    if (is.null(col_specs) || length(col_specs) == 0) {
+      stop("`col_specs` must be a non-empty list of column specifications.")
+    }
+
     # -------------------------------------------------------------------------
     # Reactive state
     # -------------------------------------------------------------------------
@@ -239,6 +243,7 @@ flexible_table_server <- function(
           remaining <- filter(table_data(), id != row_id)
           if (nrow(remaining) == 0) {
             remaining <- make_row(next_id(), col_specs)
+            bump_id()
           }
           table_data(remaining)
         },
@@ -292,7 +297,7 @@ flexible_table_server <- function(
     # Render table
     # -------------------------------------------------------------------------
 
-    make_delete_button <- function(index) {
+    make_delete_button <- function(value, index) {
       row_id <- table_data()$id[index]
       btn_id <- ns(paste0("delete_", row_id))
       tags$button(
@@ -329,50 +334,9 @@ flexible_table_server <- function(
     reactive({
       data <- table_data() |>
         select(-id, -delete) |>
-        filter(if_all(everything(), ~ !is.null(.x) & !is.na(.x) & .x != ""))
+        filter(if_any(everything(), ~ !is.null(.x) & !is.na(.x) & .x != ""))
 
       if (duplicates_allowed) data else distinct(data)
     })
   })
-}
-
-
-#' Register a delete button handler for one row
-#'
-#' Creates an [shiny::observeEvent()] that listens for clicks on the delete
-#' button for the given row and removes that row from `table_data`. If the
-#' deleted row was the last one, a fresh blank row is substituted so the table
-#' is never left empty.
-#'
-#' **Note:** This function closes over `input`, `table_data`, `next_id`, and
-#' `col_specs` from the parent [flexible_table_server()] call. It is not a
-#' pure function and must be called from within the module server.
-#'
-#' `ignoreInit = TRUE` is required to prevent the observer from firing
-#' immediately on registration, which would cause phantom deletions on startup.
-#'
-#' @param row_id `numeric(1)`. The unique row identifier whose delete button
-#'   this handler is bound to.
-#'
-#' @return Called for its side effect (registering an observer). Returns the
-#'   observer handle invisibly.
-#'
-#' @seealso [flexible_table_server()]
-#'
-#' @importFrom shiny observeEvent
-#' @importFrom dplyr filter
-#'
-#' @noRd
-register_delete_handler <- function(row_id) {
-  observeEvent(
-    input[[paste0("delete_", row_id)]],
-    {
-      remaining <- filter(table_data(), id != row_id)
-      if (nrow(remaining) == 0) {
-        remaining <- make_row(next_id(), col_specs)
-      }
-      table_data(remaining)
-    },
-    ignoreInit = TRUE
-  )
 }
