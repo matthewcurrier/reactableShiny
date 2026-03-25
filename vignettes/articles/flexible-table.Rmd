@@ -18,7 +18,7 @@ knitr::opts_chunk$set(
 
 # Overview
 
-The `flexible__table__ui()` and `flexible__table__server()` r shiny module leverage the [reactable package](https://glin.github.io/reactable/) to facilitate one particular use-case for dynamic data entry. The user establishes choices for a select dropdown which are passed into a reactable table for selection. The user can __add rows__, __delete rows__, and __reset the table__. The module __returns a reactive data frame__ of the current selections.
+The `flexible_table_ui()` and `flexible_table_server()` r shiny module leverage the [reactable package](https://glin.github.io/reactable/) to facilitate dynamic data entry. Reactable acts as a scaffold for user input. The user establishes choices for a select dropdown which are passed into a reactable table for selection. The user can __add rows__, __delete rows__, and __reset the table__. The module __returns a reactive data frame__ of the current selections.
 
 
 ## Simple Example: People Who Live in Your Home
@@ -185,14 +185,14 @@ ui <- bslib::page_fluid(
 ### Wiring up the server
 
 `flexible_table_server()` returns a **reactive data frame** of the current
-table contents. Rows where every cell is blank are excluded. Assign the return
-value to a variable to use it downstream:
+table contents. The default behavior is to exclude rows where every cell in blank. This feature can be controlled through a parameter called `duplicates_allowed`. The default value for `duplicates_allowed` is `FALSE`.
 
 ```{r}
 server <- function(input, output, session) {
 
   selected <- flexible_table_server(
     id        = "my_table",
+    duplicates_allowed = FALSE,
     col_specs = col_specs
   )
 
@@ -204,39 +204,8 @@ server <- function(input, output, session) {
 }
 ```
 
-### Complete minimal example
+### Example with Duplicates Allowed
 
-```{r}
-library(shiny)
-library(bslib)
-library(reactable.shiny)
-
-home_occupants <- c("mother", "father", "grandmother", "grandfather", "sibling", "sibling (male)", "sibling (female)", "step-mother", "step-father", "partner", "spouse")
-
-col_specs <- list(
-  list(
-    name    = "home_occupant_id",
-    label   = "Home Occupants",
-    choices = setNames(
-      c(1:length(home_occupants)),
-      home_occupants
-    )
-  )
-)
-
-ui <- page_fluid(
-  do.call(tagList, flexible_table_ui("example")),
-  verbatimTextOutput("result")
-)
-
-server <- function(input, output, session) {
-  selected <- flexible_table_server("example", col_specs)
-
-  output$result <- renderPrint(selected())
-}
-
-shinyApp(ui, server)
-```
 
 
 In the above example, you can see that a user can add as many 'siblings' or 'mothers' or 'fathers' as they like.
