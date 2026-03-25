@@ -15,42 +15,51 @@ knitr::opts_chunk$set(
 )
 ```
 
-The `flexible_table` r shiny module provides an easy way to create dynamic data entry.
-Each row contains one dropdown per column. Rows can be added, deleted, and
-reset. The module returns a reactive data frame of the current selections,
-which updates live as the user interacts with the table.
+
+# Overview
+
+The `flexible__table__ui()` and `flexible__table__server()` r shiny module leverage the [reactable package](https://glin.github.io/reactable/) to facilitate one particular use-case for dynamic data entry. The user establishes choices for a select dropdown which are passed into a reactable table for selection. The user can __add rows__, __delete rows__, and __reset the table__. The module __returns a reactive data frame__ of the current selections.
 
 
 ## Simple Example: People Who Live in Your Home
 
-Let's say you have a form that asks users who lives in their home.
-
-A short list of possibilities of who could live in a users home is:
-
-
-*  mother
-*  father
-*  grandmother
-*  grandfather
-*  sibling
-*  sibling (male)
-*  sibling (female)
-*  step-mother
-*  step-father
-*  partner
-*  spouse
+Let's say you have a survey where you want to know who lives in the household with a user. Your list of possible people includes the below:
 
 ```{r}
-home_occupants <- c("mother", "father", "grandmother", "grandfather", "sibling", "sibling (male)", "sibling (female)", "step-mother", "step-father", "partner", "spouse")
+home_occupants <- c(
+  "mother",
+  "father",
+  "grandmother",
+  "grandfather",
+  "sibling",
+  "sibling (male)",
+  "sibling (female)",
+  "step-mother",
+  "step-father",
+  "partner",
+  "spouse")
+```
+
+You are also curious to know what the people in this household do for a living.
+
+
+```{r}
+professions <- c(
+  "doctor",
+  "lawyer",
+  "professor",
+  "astronaut",
+  "chef",
+  "dog walker"
+)
 ```
 
 
-### To specify 
+
+### Step 1: Detail the Dropdown Specifications
 
 
-Column specifications
-
-Every column in the table is described by a **column spec** — a named list
+Every dropdown in the table is described by a **column spec** — a named list
 with at minimum a `name`, `label`, and `choices`:
 
 ```{r}
@@ -62,15 +71,87 @@ col_specs <- list(
       c(1:length(home_occupants)),
       home_occupants
     )
+  ),
+  list(
+    name = "professions",
+    label = "Profession",
+    choices = setNames(
+      c(1:length(professions)),
+      professions      
+    )
   )
 )
 ```
 
-The first entry in each `choices` vector is a blank placeholder — a value of
-`""` with a label of `""`. This is the default empty state for a new row.
+For this example, we will be collecting information on `home_occupant` and `profession`.
 
-> **Note:** R does not allow `"" = ""` as inline named-vector syntax. Use
-> `setNames()` to assign an empty string as a name.
+
+### Step 2: Create Shiny App
+
+```{r}
+
+library(shiny)
+library(bslib)
+library(purrr)
+library(reactable)
+library(reactable.shiny)
+
+home_occupants <- c(
+  "mother",
+  "father",
+  "grandmother",
+  "grandfather",
+  "sibling",
+  "sibling (male)",
+  "sibling (female)",
+  "step-mother",
+  "step-father",
+  "partner",
+  "spouse")
+
+professions <- c(
+  "doctor",
+  "lawyer",
+  "professor",
+  "astronaut",
+  "chef",
+  "dog walker"
+)
+
+col_specs <- list(
+  list(
+    name    = "home_occupants",
+    label   = "Home Occupants",
+    choices = setNames(
+      c(1:length(home_occupants)),
+      home_occupants
+    )
+  ),
+  list(
+    name = "professions",
+    label = "Profession",
+    choices = setNames(
+      c(1:length(professions)),
+      professions      
+    )
+  )
+)
+
+ui <- page_fluid(
+  do.call(tagList, flexible_table_ui("example")),
+  verbatimTextOutput("result")
+)
+
+server <- function(input, output, session) {
+  selected <- flexible_table_server("example", col_specs)
+
+  output$result <- renderPrint(selected())
+}
+
+shinyApp(ui, server)
+
+```
+
 
 ### Wiring up the UI
 
@@ -225,7 +306,19 @@ library(shiny)
 library(bslib)
 library(reactable.shiny)
 
-home_occupants <- c("mother", "father", "grandmother", "grandfather", "sibling", "sibling (male)", "sibling (female)", "step-mother", "step-father", "partner", "spouse")
+
+home_occupants <- c("mother",
+  "father",
+  "grandmother",
+  "grandfather",
+  "sibling",
+  "sibling (male)",
+  "sibling (female)",
+  "step-mother",
+  "step-father",
+  "partner",
+  "spouse")
+
 
 
 
