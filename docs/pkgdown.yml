@@ -4,7 +4,7 @@ pkgdown_sha: ~
 articles:
   annotator_table: annotator_table.html
   articles/flexible-table: flexible-table.html
-last_built: 2026-03-29T18:18Z
+last_built: 2026-03-29T18:20Z
 urls:
   reference: https://matthewcurrier.github.io/reactable.shiny/reference
   article: https://matthewcurrier.github.io/reactable.shiny/articles
