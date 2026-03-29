@@ -1,0 +1,107 @@
+---
+title: "Annotator Table"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Annotator Table}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>"
+)
+```
+
+The annotator table is a Shiny module that layers interactive input columns on top of a read-only data frame. It is designed for human-in-the-loop workflows where you want reviewers to tag, categorise, or score every row in a dataset — without being able to edit the underlying data.
+
+## How it works
+
+You provide a source data frame and a list of **column specifications** (`col_specs`). Each spec declares whether the column should be a read-only display column or an interactive input — `select`, `checkbox`, `text`, `number`, or `radio`. The module renders everything in a single [reactable](https://glin.github.io/reactable/) table and returns a reactive data frame of annotations for rows that have been touched by the user.
+
+A few things worth knowing:
+
+- **Annotations survive filtering.** If `source_data` is a reactive expression that can change (e.g. driven by a search box), annotations for rows that temporarily disappear are preserved and restored when those rows return.
+- **Only touched rows are returned.** The module's return value excludes rows where every input is still at its default, so you don't have to filter out blanks yourself.
+- **Gating is built in.** Any input column can declare `gates = "my_checkbox"` to have its interactivity controlled by a checkbox in the same row. When the checkbox is unchecked the gated inputs grey out instantly — no Shiny round-trip needed.
+
+## Basic usage
+
+Attach the UI placeholder with `annotator_table_ui()` and start the server logic with `annotator_table_server()`. The server function returns a reactive that you can observe or pass downstream.
+
+```r
+library(shiny)
+library(bslib)
+
+col_specs <- list(
+  list(name = "car",      type = "display",  label = "Car"),
+  list(name = "mpg",      type = "display",  label = "MPG"),
+  list(name = "cyl",      type = "display",  label = "Cylinders"),
+  list(name = "category", type = "select",   label = "Category",
+       choices = c("Economy" = "economy", "Sport" = "sport", "Truck" = "truck")),
+  list(name = "approved", type = "checkbox", label = "Approved?"),
+  list(name = "notes",    type = "text",     label = "Notes",
+       placeholder = "Optional comment...")
+)
+
+ui <- page_fluid(
+  h4("Review cars"),
+  annotator_table_ui("cars"),
+  hr(),
+  h4("Annotations so far"),
+  tableOutput("result")
+)
+
+server <- function(input, output, session) {
+  # Add a row-identifier column — mtcars uses row names
+  cars_df <- tibble::rownames_to_column(mtcars, var = "car")
+
+  source <- reactive(cars_df)
+
+  annotations <- annotator_table_server(
+    id          = "cars",
+    source_data = source,
+    row_id      = "car",
+    col_specs   = col_specs
+  )
+
+  output$result <- renderTable(annotations())
+}
+
+shinyApp(ui, server)
+```
+
+Running the app produces a table with the `car`, `mpg`, and `cyl` columns shown as plain text, and a **Category** dropdown, **Approved?** checkbox, and **Notes** field in each row. `output$result` updates in real time to show only the rows where at least one input has been filled in.
+
+## Column types
+
+| Type | Returns | Key fields |
+|---|---|---|
+| `display` | — (read-only) | `name` must exist in `source_data` |
+| `select` | `character` | `choices` (named character vector) |
+| `checkbox` | `logical` | — |
+| `text` | `character` | `placeholder` (optional) |
+| `number` | `numeric` | `min`, `max` (optional) |
+| `radio` | `character` | `choices` (named character vector) |
+
+Every column type also accepts an optional `label` (shown as the column header; defaults to `name`) and `width` in pixels.
+
+## Gating example
+
+Use `gates` to make one checkbox control whether other inputs in the same row are interactive. This is useful when a "flag this row" checkbox should unlock additional detail fields.
+
+```r
+col_specs <- list(
+  list(name = "car",      type = "display",  label = "Car"),
+  list(name = "flag",     type = "checkbox", label = "Flag for review?"),
+  list(name = "reason",   type = "select",   label = "Reason",
+       choices = c("Price" = "price", "Safety" = "safety"),
+       gates   = "flag"),
+  list(name = "notes",    type = "text",     label = "Notes",
+       placeholder = "Details...",
+       gates   = "flag")
+)
+```
+
+Here, **Reason** and **Notes** are greyed out until **Flag for review?** is checked. Unchecking it again restores the previous values — they are never cleared.
