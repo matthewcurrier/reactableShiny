@@ -9,7 +9,8 @@ annotator_table_server(
   source_data,
   row_id,
   col_specs,
-  reactable_theme = theme_bare
+  reactable_theme = theme_bare,
+  reactable_options = list()
 )
 }
 \arguments{

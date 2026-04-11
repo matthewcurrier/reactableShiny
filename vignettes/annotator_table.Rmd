@@ -1,6 +1,7 @@
 ---
 title: "Annotator Table"
 output: rmarkdown::html_vignette
+runtime: shiny
 vignette: >
   %\VignetteIndexEntry{Annotator Table}
   %\VignetteEngine{knitr::rmarkdown}
@@ -105,3 +106,156 @@ col_specs <- list(
 ```
 
 Here, **Reason** and **Notes** are greyed out until **Flag for review?** is checked. Unchecking it again restores the previous values — they are never cleared.
+
+
+
+```{r module, echo=FALSE}
+library(dplyr)
+library(purrr)
+library(here)
+library(reactable)
+library(reactable.extras)
+library(reactable.shiny)
+source(here("R", "utils_annotator.R"))
+source(here("R", "mod_annotator_table.R"))
+source(here("R", "themes.R"))
+```
+
+
+
+```{css echo=FALSE}
+/* -------------------------------------------------------
+   Annotator table demo styles
+   ------------------------------------------------------- */
+
+.rt-td,
+.rt-th {
+  vertical-align: middle !important;
+  padding: 6px 10px !important;
+}
+
+.card {
+  margin-bottom: 1.25rem;
+  border: 1px solid #dee2e6;
+}
+
+.card-header {
+  font-weight: 600;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.form-control[type="text"] {
+  font-size: 0.875rem;
+  padding: 2px 6px;
+  height: auto;
+}
+
+.form-control::placeholder {
+  color: #adb5bd;
+}
+
+/* Break the app container out of the document's content column */
+.breakout {
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 1rem;
+}
+```
+
+
+```{r load, echo=FALSE}
+library(here)
+library(arrow)
+library(dplyr)
+
+milestones <- read_parquet(here("inst", "datasets", "df_developmental_milestones.parquet"))
+
+# str(milestones)
+# glimpse(milestones)
+
+```
+
+
+```{r app, echo=FALSE}
+library(reactable)
+library(reactable.extras)
+library(reactable.shiny)
+
+
+# chunk: col_specs
+col_specs <- list(
+  list(name = "id",        type = "display",  label = "ID",        width = 60),
+  list(name = "age",       type = "display",  label = "Age",       width = 110),
+  list(name = "category",  type = "display",  label = "Category",  width = 180),
+  list(name = "milestone", type = "display",  label = "Milestone", width = 420),
+  list(name = "met",       type = "checkbox", label = "Met?",      width = 60),
+  list(name = "notes",     type = "text",     label = "Notes",
+       placeholder = "Short note...",          width = 200)
+)
+
+# chunk: shiny app
+ui <- bslib::page_fluid(
+  theme = bslib::bs_theme(version = 5),
+
+  htmltools::div(
+    class = "breakout",
+
+    bslib::card(
+      bslib::card_header("Developmental Milestones"),
+      bslib::card_body(
+        annotator_table_ui("milestones")
+      )
+    ),
+
+    bslib::card(
+      bslib::card_header("Annotations so far"),
+      bslib::card_body(
+        tableOutput("annotations_out")
+      )
+    )
+  )
+)
+
+server <- function(input, output, session) {
+  source_data <- shiny::reactive(milestones)
+
+  annotations <- annotator_table_server(
+    id          = "milestones",
+    source_data = source_data,
+    row_id      = "id",
+    col_specs   = col_specs
+  )
+
+  output$annotations_out <- shiny::renderTable({
+    ann <- annotations()
+
+    # Guard: nothing touched yet → friendly message rather than empty table
+    if (nrow(ann) == 0) {
+      return(data.frame(Message = "No milestones annotated yet."))
+    }
+
+    # Join back age/category/milestone so the reviewer sees context,
+    # not just a bare ID and checkbox value
+    purrr::reduce(
+      list(ann, milestones),
+      ~ dplyr::left_join(.x, .y, by = "id")
+    ) |>
+      dplyr::select(id, age, category, milestone, met, notes)
+  })
+}
+
+
+```
+
+
+
+
+
+```{r, out.width='100vw', out.height="800px", out.extra='style="margin-left: calc(50% - 50vw); max-width: none;"'}
+shinyApp(ui, server)
+```
+
+

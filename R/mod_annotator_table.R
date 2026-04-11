@@ -126,7 +126,8 @@ annotator_table_server <- function(
   source_data,
   row_id,
   col_specs,
-  reactable_theme = theme_bare
+  reactable_theme = theme_bare,
+  reactable_options = list()
 ) {
   if (is.null(col_specs) || length(col_specs) == 0) {
     stop("`col_specs` must be a non-empty list of column specifications.")
@@ -135,9 +136,15 @@ annotator_table_server <- function(
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    # Separate display specs from input specs — used throughout
-    input_specs <- keep(col_specs, ~ .x$type != "display")
-    display_specs <- keep(col_specs, ~ .x$type == "display")
+    # After:
+    input_specs <- keep(
+      col_specs,
+      ~ !.x$type %in% c("display", "clickable_display")
+    )
+    display_specs <- keep(
+      col_specs,
+      ~ .x$type %in% c("display", "clickable_display")
+    )
 
     # -------------------------------------------------------------------------
     # Reactive state
@@ -209,43 +216,33 @@ annotator_table_server <- function(
       }
     })
 
-    # -------------------------------------------------------------------------
-    # Render table
-    #
-    # Takes a reactive dependency on source_data() and
-    # reactable_remount_trigger() — but NOT on annotations(). Using
-    # isolate(annotations()) gives us a snapshot for rendering, and wrapping
-    # both snapshots in plain functions means the cell renderers call
-    # annotations() and source_data() without registering reactive
-    # dependencies, which would otherwise re-trigger the render on every
-    # input change and cause flicker.
-    # -------------------------------------------------------------------------
-
     output$table <- renderReactable({
       force(reactable_remount_trigger())
 
-      # Take reactive dependencies explicitly here and nowhere else
       data <- source_data()
       ann <- isolate(annotations())
-
-      # Plain wrappers around the snapshots — the cell renderers call these
-      # exactly like reactives (ann_snap(), data_snap()) but they return a
-      # frozen value and register no reactive dependency
       ann_snap <- function() ann
       data_snap <- function() data
 
-      render_data <- left_join(data, ann, by = row_id)
+      spec_names <- map_chr(col_specs, "name")
+      render_data <- left_join(data, ann, by = row_id) |>
+        dplyr::select(dplyr::all_of(c(row_id, spec_names)))
 
       col_defs <- map(col_specs, \(spec) {
         make_input_col_def(spec, ann_snap, row_id, ns, data_snap)
       }) |>
         set_names(map_chr(col_specs, "name"))
 
-      reactable(
-        render_data,
-        columns = col_defs,
-        sortable = FALSE,
-        theme = reactable_theme
+      do.call(
+        reactable,
+        c(
+          list(
+            data = render_data,
+            columns = col_defs,
+            theme = reactable_theme
+          ),
+          reactable_options
+        )
       )
     })
 

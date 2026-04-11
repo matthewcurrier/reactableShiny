@@ -2,8 +2,19 @@
 # Internal helpers for the annotator_table module.
 # None of these are exported — they are implementation details of
 # annotator_table_server() and its rendering pipeline.
+#
+# NOTE: `cell` cannot be passed via `col_def_options` on input columns —
+# the cell renderer is authoritative and owned by the module. Passing `cell`
+# in `col_def_options` will cause do.call() to error with a duplicate
+# argument, which is intentional: it surfaces the mistake immediately rather
+# than silently discarding the custom renderer.
+#
+# EXCEPTION: `cell` MAY be passed via `col_def_options` on plain `display`
+# columns only, since make_display_col_def does not set a cell renderer.
+# This is the supported escape hatch for custom display rendering (e.g.
+# adding icons). It is not available on `clickable_display` columns, which
+# own their cell renderer like all input types.
 # =============================================================================
-
 
 # -----------------------------------------------------------------------
 # Annotation data frame helpers
@@ -22,13 +33,14 @@
 #'
 #' @noRd
 default_annotation_value <- function(spec) {
-  switch(spec$type,
-    select        = NA_character_,
-    text          = NA_character_,
-    radio         = NA_character_,
-    checkbox      = FALSE,
+  switch(
+    spec$type,
+    select = NA_character_,
+    text = NA_character_,
+    radio = NA_character_,
+    checkbox = FALSE,
     text_checkbox = FALSE,
-    number        = NA_real_,
+    number = NA_real_,
     stop(sprintf("Unknown input column type: '%s'", spec$type))
   )
 }
@@ -52,13 +64,13 @@ default_annotation_value <- function(spec) {
 #'
 #' @noRd
 initial_annotations <- function(source_data, row_id, input_specs) {
-  id_values           <- source_data[[row_id]]
-  default_cols        <- map(input_specs, default_annotation_value)
+  id_values <- source_data[[row_id]]
+  default_cols <- map(input_specs, default_annotation_value)
   names(default_cols) <- map_chr(input_specs, "name")
 
   # Name the ID column using the actual value of row_id (e.g. "car"),
   # not the literal string "row_id" — otherwise joins and subsetting break
-  id_col        <- list(id_values)
+  id_col <- list(id_values)
   names(id_col) <- row_id
 
   # as.data.frame recycles scalar defaults to match id length, but cannot
@@ -67,7 +79,7 @@ initial_annotations <- function(source_data, row_id, input_specs) {
   # as.data.frame(list(col = NULL)) silently drops columns.
   if (length(id_values) == 0) {
     col_names <- c(row_id, map_chr(input_specs, "name"))
-    empty     <- as.data.frame(
+    empty <- as.data.frame(
       matrix(nrow = 0, ncol = length(col_names)),
       stringsAsFactors = FALSE
     )
@@ -102,7 +114,7 @@ initial_annotations <- function(source_data, row_id, input_specs) {
 #'
 #' @noRd
 merge_annotations <- function(source_data, row_id, input_specs, existing) {
-  blank  <- initial_annotations(source_data, row_id, input_specs)
+  blank <- initial_annotations(source_data, row_id, input_specs)
 
   # Left join blank -> existing so that rows with prior annotations get their
   # values restored. Rows with no prior annotation keep the blank defaults.
@@ -115,7 +127,7 @@ merge_annotations <- function(source_data, row_id, input_specs, existing) {
   # left_join produces NA for any column that had no matching row in existing.
   # Replace those NAs with the appropriate untouched default for each type.
   for (spec in input_specs) {
-    col          <- spec$name
+    col <- spec$name
     missing_rows <- is.na(merged[[col]])
     if (any(missing_rows)) {
       merged[[col]][missing_rows] <- default_annotation_value(spec)
@@ -146,13 +158,14 @@ merge_annotations <- function(source_data, row_id, input_specs, existing) {
 #'
 #' @noRd
 is_touched <- function(value, type) {
-  switch(type,
-    select        = !is.null(value) && !is.na(value) && nzchar(value),
-    text          = !is.null(value) && !is.na(value) && nzchar(value),
-    radio         = !is.null(value) && !is.na(value) && nzchar(value),
-    checkbox      = isTRUE(value),
+  switch(
+    type,
+    select = !is.null(value) && !is.na(value) && nzchar(value),
+    text = !is.null(value) && !is.na(value) && nzchar(value),
+    radio = !is.null(value) && !is.na(value) && nzchar(value),
+    checkbox = isTRUE(value),
     text_checkbox = isTRUE(value),
-    number        = !is.null(value) && !is.na(value) && value != 0,
+    number = !is.null(value) && !is.na(value) && value != 0,
     stop(sprintf("Unknown input column type: '%s'", type))
   )
 }
@@ -205,8 +218,18 @@ any_touched <- function(annotations, input_specs) {
 #'
 #' @noRd
 gate_is_open <- function(spec, ann, index) {
-  if (is.null(spec$gates)) return(TRUE)
-  isTRUE(ann[[spec$gates]][index])
+  if (is.null(spec$gates)) {
+    return(TRUE)
+  }
+  gate_value <- ann[[spec$gates]][index]
+  if (!is.null(spec$gates_values)) {
+    return(
+      !is.null(gate_value) &&
+        !is.na(gate_value) &&
+        gate_value %in% spec$gates_values
+    )
+  }
+  isTRUE(gate_value) # existing checkbox behaviour unchanged
 }
 
 
@@ -225,7 +248,9 @@ gate_is_open <- function(spec, ann, index) {
 #'
 #' @noRd
 gated_by_id <- function(spec, ns, id_value) {
-  if (is.null(spec$gates)) return(NULL)
+  if (is.null(spec$gates)) {
+    return(NULL)
+  }
   ns(paste0(spec$gates, "_", id_value))
 }
 
@@ -275,6 +300,30 @@ gating_checkbox_onchange <- function(input_id) {
 
 # -----------------------------------------------------------------------
 # Column definition builders
+#
+# Every builder follows the same pattern:
+#
+#   do.call(
+#     colDef,
+#     c(
+#       list(
+#         name  = ...,   # always from spec
+#         width = ...,   # always from spec
+#         cell  = ...    # input builders only; owned by the module
+#       ),
+#       spec$col_def_options %||% list()
+#     )
+#   )
+#
+# Fixed fields (name, width, cell) go in the inner list(). Any additional
+# reactable::colDef() arguments — minWidth, maxWidth, align, headerClass,
+# etc. — are passed by the caller via spec$col_def_options and merged in
+# after. Because do.call() errors on duplicate arguments, passing `cell`
+# inside col_def_options will fail loudly rather than silently discarding
+# the custom renderer.
+#
+# EXCEPTION: `cell` may be passed via col_def_options for plain `display`
+# columns only, since make_display_col_def does not set a cell renderer.
 # -----------------------------------------------------------------------
 
 #' Build a reactable colDef for a display column
@@ -282,7 +331,14 @@ gating_checkbox_onchange <- function(input_id) {
 #' Display columns are read-only — they show values from the source data
 #' frame with no interactive cell renderer.
 #'
-#' @param spec `list`. A single col_spec with `type = "display"`.
+#' Because no `cell` is set here, callers may pass one via `col_def_options`
+#' as an escape hatch for custom display rendering (e.g. icon badges). This
+#' is the only column type where passing `cell` in `col_def_options` is
+#' supported.
+#'
+#' @param spec `list`. A single col_spec with `type = "display"`. Accepts an
+#'   optional `col_def_options` list of additional [reactable::colDef()]
+#'   arguments (e.g. `minWidth`, `maxWidth`, `align`, `cell`).
 #'
 #' @return A [reactable::colDef()] object.
 #'
@@ -290,9 +346,96 @@ gating_checkbox_onchange <- function(input_id) {
 #'
 #' @noRd
 make_display_col_def <- function(spec) {
-  colDef(
-    name  = spec$label %||% spec$name,
-    width = spec$width
+  do.call(
+    colDef,
+    c(
+      list(
+        name = spec$label %||% spec$name,
+        width = spec$width
+      ),
+      spec$col_def_options %||% list()
+    )
+  )
+}
+
+
+#' Build a reactable colDef for a clickable display column
+#'
+#' Like `make_display_col_def`, but wraps the cell value in a clickable
+#' `<div>` that toggles a named checkbox column in the same row when
+#' clicked. This gives users a larger click target than the checkbox alone.
+#'
+#' The col_spec must include a `toggles` field naming the checkbox column
+#' to toggle (e.g. `toggles = "met"`). The pattern mirrors the `gates`
+#' field used by input columns: `gates` controls interactivity; `toggles`
+#' controls the checked state on click.
+#'
+#' The `onclick` handler:
+#' \enumerate{
+#'   \item Finds the target checkbox by its namespaced DOM ID.
+#'   \item Inverts its checked state.
+#'   \item Reports the new value to Shiny via `Shiny.setInputValue()` with
+#'     `priority: 'event'` so Shiny always processes the update even if
+#'     the value did not change numerically.
+#' }
+#'
+#' Note: if the target checkbox drives gated inputs (i.e. it has a `gates`
+#' field on other columns), clicking the display cell will toggle the
+#' checkbox but will NOT trigger the gating CSS update — only the
+#' checkbox's own `onchange` handler does that. If gating + clickable
+#' display are combined, extend the `onclick` JS here to also run the
+#' gating logic.
+#'
+#' @param spec `list`. A single col_spec with `type = "clickable_display"`.
+#'   Must include `toggles`: the `name` of the checkbox col_spec to toggle.
+#'   Accepts an optional `col_def_options` list of additional
+#'   [reactable::colDef()] arguments. `cell` may not be included in
+#'   `col_def_options`.
+#' @param annotations `reactive`. The annotations reactiveVal from the
+#'   parent module server. Used to look up the row ID at render time.
+#' @param row_id `character(1)`. Name of the ID column.
+#' @param ns `function`. The module namespace function.
+#'
+#' @return A [reactable::colDef()] object.
+#'
+#' @importFrom reactable colDef
+#' @importFrom shiny tags
+#'
+#' @noRd
+# Around line 310 in utils_annotator.R
+make_clickable_display_col_def <- function(spec, annotations, row_id, ns) {
+  do.call(
+    colDef,
+    c(
+      list(
+        name = spec$label %||% spec$name,
+        width = spec$width,
+        html = TRUE, # <-- add this
+        cell = function(value, index) {
+          ann <- annotations()
+          id_value <- ann[[row_id]][index]
+          check_id <- ns(paste0(spec$toggles, "_", id_value))
+
+          content <- if (!is.null(spec$render)) spec$render(value) else value
+
+          as.character(
+            # <-- wrap in as.character()
+            tags$div(
+              content,
+              style = "cursor: pointer;",
+              onclick = sprintf(
+                "var cb = document.getElementById('%s');
+                 cb.checked = !cb.checked;
+                 Shiny.setInputValue('%s', cb.checked, {priority: 'event'});",
+                check_id,
+                check_id
+              )
+            )
+          )
+        }
+      ),
+      spec$col_def_options %||% list()
+    )
   )
 }
 
@@ -310,7 +453,9 @@ make_display_col_def <- function(spec) {
 #'
 #' @param spec `list`. A single col_spec with `type = "text_checkbox"`. Must
 #'   include a `display_col` field naming the source data column whose text
-#'   to show as the clickable label.
+#'   to show as the clickable label. Accepts an optional `col_def_options`
+#'   list of additional [reactable::colDef()] arguments. `cell` may not be
+#'   included in `col_def_options`.
 #' @param annotations `reactive`. The annotations reactiveVal from the parent
 #'   module server.
 #' @param source_data `reactive`. The source data reactive, used to look up
@@ -324,41 +469,53 @@ make_display_col_def <- function(spec) {
 #' @importFrom shiny tags
 #'
 #' @noRd
-make_text_checkbox_col_def <- function(spec, annotations, source_data, row_id, ns) {
-  colDef(
-    name  = spec$label %||% spec$name,
-    width = spec$width,
-    cell  = function(value, index) {
-      ann          <- annotations()
-      id_value     <- ann[[row_id]][index]
-      input_id     <- ns(paste0(spec$name, "_", id_value))
-      is_checked   <- isTRUE(ann[[spec$name]][index])
+make_text_checkbox_col_def <- function(
+  spec,
+  annotations,
+  source_data,
+  row_id,
+  ns
+) {
+  do.call(
+    colDef,
+    c(
+      list(
+        name = spec$label %||% spec$name,
+        width = spec$width,
+        cell = function(value, index) {
+          ann <- annotations()
+          id_value <- ann[[row_id]][index]
+          input_id <- ns(paste0(spec$name, "_", id_value))
+          is_checked <- isTRUE(ann[[spec$name]][index])
 
-      # Look up display text from source data by matching row ID
-      src          <- source_data()
-      display_text <- src[[spec$display_col]][src[[row_id]] == id_value]
+          # Look up display text from source data by matching row ID
+          src <- source_data()
+          display_text <- src[[spec$display_col]][src[[row_id]] == id_value]
 
-      # text_checkbox can itself be gated by another checkbox
-      open  <- gate_is_open(spec, ann, index)
-      gb_id <- gated_by_id(spec, ns, id_value)
+          # text_checkbox can itself be gated by another checkbox
+          open <- gate_is_open(spec, ann, index)
+          gb_id <- gated_by_id(spec, ns, id_value)
 
-      # Wrap checkbox inside a label — clicking the text toggles the checkbox
-      # natively without extra JavaScript. The label is the full clickable area.
-      tags$label(
-        `data-gated-by` = gb_id,
-        style = paste0(
-          "cursor: pointer; margin: 0; display: flex; align-items: center; gap: 6px;",
-          if (!open) " opacity: 0.4; pointer-events: none;" else ""
-        ),
-        tags$input(
-          type     = "checkbox",
-          id       = input_id,
-          checked  = if (is_checked) "checked" else NULL,
-          onchange = gating_checkbox_onchange(input_id)
-        ),
-        display_text
-      )
-    }
+          # Wrap checkbox inside a label — clicking the text toggles the checkbox
+          # natively without extra JavaScript. The label is the full clickable area.
+          tags$label(
+            `data-gated-by` = gb_id,
+            style = paste0(
+              "cursor: pointer; margin: 0; display: flex; align-items: center; gap: 6px;",
+              if (!open) " opacity: 0.4; pointer-events: none;" else ""
+            ),
+            tags$input(
+              type = "checkbox",
+              id = input_id,
+              checked = if (is_checked) "checked" else NULL,
+              onchange = gating_checkbox_onchange(input_id)
+            ),
+            display_text
+          )
+        }
+      ),
+      spec$col_def_options %||% list()
+    )
   )
 }
 
@@ -371,6 +528,9 @@ make_text_checkbox_col_def <- function(spec, annotations, source_data, row_id, n
 #'
 #' @param spec `list`. A single col_spec with `type = "checkbox"`. Optionally
 #'   includes a `gates` field if this checkbox is itself gated by another.
+#'   Accepts an optional `col_def_options` list of additional
+#'   [reactable::colDef()] arguments. `cell` may not be included in
+#'   `col_def_options`.
 #' @param annotations `reactive`. The annotations reactiveVal from the parent
 #'   module server.
 #' @param row_id `character(1)`. Name of the ID column.
@@ -383,27 +543,33 @@ make_text_checkbox_col_def <- function(spec, annotations, source_data, row_id, n
 #'
 #' @noRd
 make_checkbox_col_def <- function(spec, annotations, row_id, ns) {
-  colDef(
-    name  = spec$label %||% spec$name,
-    width = spec$width,
-    cell  = function(value, index) {
-      ann        <- annotations()
-      id_value   <- ann[[row_id]][index]
-      input_id   <- ns(paste0(spec$name, "_", id_value))
-      is_checked <- isTRUE(ann[[spec$name]][index])
-      open       <- gate_is_open(spec, ann, index)
-      gb_id      <- gated_by_id(spec, ns, id_value)
+  do.call(
+    colDef,
+    c(
+      list(
+        name = spec$label %||% spec$name,
+        width = spec$width,
+        cell = function(value, index) {
+          ann <- annotations()
+          id_value <- ann[[row_id]][index]
+          input_id <- ns(paste0(spec$name, "_", id_value))
+          is_checked <- isTRUE(ann[[spec$name]][index])
+          open <- gate_is_open(spec, ann, index)
+          gb_id <- gated_by_id(spec, ns, id_value)
 
-      tags$input(
-        type            = "checkbox",
-        id              = input_id,
-        checked         = if (is_checked) "checked" else NULL,
-        style           = gated_style(open),
-        `data-gated-by` = gb_id,
-        # onchange reports to Shiny and drives any downstream gated inputs
-        onchange        = gating_checkbox_onchange(input_id)
-      )
-    }
+          tags$input(
+            type = "checkbox",
+            id = input_id,
+            checked = if (is_checked) "checked" else NULL,
+            style = gated_style(open),
+            `data-gated-by` = gb_id,
+            # onchange reports to Shiny and drives any downstream gated inputs
+            onchange = gating_checkbox_onchange(input_id)
+          )
+        }
+      ),
+      spec$col_def_options %||% list()
+    )
   )
 }
 
@@ -413,7 +579,9 @@ make_checkbox_col_def <- function(spec, annotations, row_id, ns) {
 #' Supports optional row gating via `spec$gates`.
 #'
 #' @param spec `list`. A single col_spec with `type = "select"`. Requires
-#'   `choices`. Optionally includes `gates`.
+#'   `choices`. Optionally includes `gates`. Accepts an optional
+#'   `col_def_options` list of additional [reactable::colDef()] arguments.
+#'   `cell` may not be included in `col_def_options`.
 #' @param annotations `reactive`. The annotations reactiveVal from the parent
 #'   module server.
 #' @param row_id `character(1)`. Name of the ID column.
@@ -426,38 +594,58 @@ make_checkbox_col_def <- function(spec, annotations, row_id, ns) {
 #'
 #' @noRd
 make_select_col_def <- function(spec, annotations, row_id, ns) {
-  colDef(
-    name  = spec$label %||% spec$name,
-    width = spec$width,
-    cell  = function(value, index) {
-      ann      <- annotations()
-      id_value <- ann[[row_id]][index]
-      input_id <- ns(paste0(spec$name, "_", id_value))
-      current  <- ann[[spec$name]][index]
-      open     <- gate_is_open(spec, ann, index)
-      gb_id    <- gated_by_id(spec, ns, id_value)
+  do.call(
+    colDef,
+    c(
+      list(
+        name = spec$label %||% spec$name,
+        width = spec$width,
+        cell = function(value, index) {
+          ann <- annotations()
+          id_value <- ann[[row_id]][index]
+          input_id <- ns(paste0(spec$name, "_", id_value))
+          current <- ann[[spec$name]][index]
+          open <- gate_is_open(spec, ann, index)
+          gb_id <- gated_by_id(spec, ns, id_value)
 
-      # Treat NA as untouched — pass "" to make_options so no option is
-      # pre-selected, and apply the muted placeholder colour
-      is_blank            <- is.na(current) || !nzchar(current)
-      current_for_options <- if (is.na(current)) "" else current
+          # Treat NA as untouched — pass "" to make_options so no option is
+          # pre-selected, and apply the muted placeholder colour
+          is_blank <- is.na(current) || !nzchar(current)
+          current_for_options <- if (is.na(current)) "" else current
+          placeholder_style <- if (is_blank) "color: #6c757d;" else ""
+          gate_style <- if (!open) "opacity: 0.4; pointer-events: none;" else ""
 
-      placeholder_style <- if (is_blank) "color: #6c757d;" else ""
-      gate_style        <- if (!open) "opacity: 0.4; pointer-events: none;" else ""
-
-      tags$select(
-        id              = input_id,
-        class           = "form-control",
-        style           = paste0(placeholder_style, gate_style),
-        `data-gated-by` = gb_id,
-        onchange        = sprintf(
-          "this.style.color = this.value === '' ? '#6c757d' : '';
-           Shiny.setInputValue('%s', this.value, {priority: 'event'})",
-          input_id
-        ),
-        make_options(spec$choices, current_for_options)
-      )
-    }
+          tags$select(
+            id = input_id,
+            class = "form-control",
+            style = paste0(placeholder_style, gate_style),
+            `data-gated-by` = gb_id,
+            `data-gates-values` = if (!is.null(spec$gates_values)) {
+              # <-- new
+              paste(spec$gates_values, collapse = ",")
+            } else {
+              NULL
+            },
+            onchange = sprintf(
+              "var v = this.value;
+     this.style.color = v === '' ? '#6c757d' : '';
+     Shiny.setInputValue('%s', v, {priority: 'event'});
+     var myId = '%s';
+     document.querySelectorAll('[data-gated-by=\"' + myId + '\"]').forEach(function(el) {
+       var raw = el.dataset.gatesValues;
+       var open = raw ? raw.split(',').indexOf(v) >= 0 : v !== '';
+       el.style.opacity       = open ? '' : '0.4';
+       el.style.pointerEvents = open ? '' : 'none';
+     });",
+              input_id,
+              input_id
+            ),
+            make_options(spec$choices, current_for_options)
+          )
+        }
+      ),
+      spec$col_def_options %||% list()
+    )
   )
 }
 
@@ -467,7 +655,9 @@ make_select_col_def <- function(spec, annotations, row_id, ns) {
 #' Supports optional row gating via `spec$gates`.
 #'
 #' @param spec `list`. A single col_spec with `type = "text"`. Optionally
-#'   includes `placeholder` and `gates`.
+#'   includes `placeholder` and `gates`. Accepts an optional `col_def_options`
+#'   list of additional [reactable::colDef()] arguments. `cell` may not be
+#'   included in `col_def_options`.
 #' @param annotations `reactive`. The annotations reactiveVal from the parent
 #'   module server.
 #' @param row_id `character(1)`. Name of the ID column.
@@ -480,32 +670,38 @@ make_select_col_def <- function(spec, annotations, row_id, ns) {
 #'
 #' @noRd
 make_text_col_def <- function(spec, annotations, row_id, ns) {
-  colDef(
-    name  = spec$label %||% spec$name,
-    width = spec$width,
-    cell  = function(value, index) {
-      ann      <- annotations()
-      id_value <- ann[[row_id]][index]
-      input_id <- ns(paste0(spec$name, "_", id_value))
-      current  <- ann[[spec$name]][index]
-      open     <- gate_is_open(spec, ann, index)
-      gb_id    <- gated_by_id(spec, ns, id_value)
+  do.call(
+    colDef,
+    c(
+      list(
+        name = spec$label %||% spec$name,
+        width = spec$width,
+        cell = function(value, index) {
+          ann <- annotations()
+          id_value <- ann[[row_id]][index]
+          input_id <- ns(paste0(spec$name, "_", id_value))
+          current <- ann[[spec$name]][index]
+          open <- gate_is_open(spec, ann, index)
+          gb_id <- gated_by_id(spec, ns, id_value)
 
-      tags$input(
-        type            = "text",
-        id              = input_id,
-        class           = "form-control",
-        # Pass NULL rather than NA — HTML renders NA as the literal string "NA"
-        value           = if (!is.na(current)) current else NULL,
-        placeholder     = spec$placeholder %||% "",
-        style           = gated_style(open),
-        `data-gated-by` = gb_id,
-        onchange        = sprintf(
-          "Shiny.setInputValue('%s', this.value, {priority: 'event'})",
-          input_id
-        )
-      )
-    }
+          tags$input(
+            type = "text",
+            id = input_id,
+            class = "form-control",
+            # Pass NULL rather than NA — HTML renders NA as the literal string "NA"
+            value = if (!is.na(current)) current else NULL,
+            placeholder = spec$placeholder %||% "",
+            style = gated_style(open),
+            `data-gated-by` = gb_id,
+            onchange = sprintf(
+              "Shiny.setInputValue('%s', this.value, {priority: 'event'})",
+              input_id
+            )
+          )
+        }
+      ),
+      spec$col_def_options %||% list()
+    )
   )
 }
 
@@ -515,7 +711,9 @@ make_text_col_def <- function(spec, annotations, row_id, ns) {
 #' Supports optional row gating via `spec$gates`.
 #'
 #' @param spec `list`. A single col_spec with `type = "number"`. Optionally
-#'   includes `min`, `max`, and `gates`.
+#'   includes `min`, `max`, and `gates`. Accepts an optional `col_def_options`
+#'   list of additional [reactable::colDef()] arguments. `cell` may not be
+#'   included in `col_def_options`.
 #' @param annotations `reactive`. The annotations reactiveVal from the parent
 #'   module server.
 #' @param row_id `character(1)`. Name of the ID column.
@@ -528,32 +726,38 @@ make_text_col_def <- function(spec, annotations, row_id, ns) {
 #'
 #' @noRd
 make_number_col_def <- function(spec, annotations, row_id, ns) {
-  colDef(
-    name  = spec$label %||% spec$name,
-    width = spec$width,
-    cell  = function(value, index) {
-      ann      <- annotations()
-      id_value <- ann[[row_id]][index]
-      input_id <- ns(paste0(spec$name, "_", id_value))
-      current  <- ann[[spec$name]][index]
-      open     <- gate_is_open(spec, ann, index)
-      gb_id    <- gated_by_id(spec, ns, id_value)
+  do.call(
+    colDef,
+    c(
+      list(
+        name = spec$label %||% spec$name,
+        width = spec$width,
+        cell = function(value, index) {
+          ann <- annotations()
+          id_value <- ann[[row_id]][index]
+          input_id <- ns(paste0(spec$name, "_", id_value))
+          current <- ann[[spec$name]][index]
+          open <- gate_is_open(spec, ann, index)
+          gb_id <- gated_by_id(spec, ns, id_value)
 
-      tags$input(
-        type            = "number",
-        id              = input_id,
-        class           = "form-control",
-        value           = if (!is.na(current)) current else NULL,
-        min             = spec$min %||% NULL,
-        max             = spec$max %||% NULL,
-        style           = gated_style(open),
-        `data-gated-by` = gb_id,
-        onchange        = sprintf(
-          "Shiny.setInputValue('%s', parseFloat(this.value), {priority: 'event'})",
-          input_id
-        )
-      )
-    }
+          tags$input(
+            type = "number",
+            id = input_id,
+            class = "form-control",
+            value = if (!is.na(current)) current else NULL,
+            min = spec$min %||% NULL,
+            max = spec$max %||% NULL,
+            style = gated_style(open),
+            `data-gated-by` = gb_id,
+            onchange = sprintf(
+              "Shiny.setInputValue('%s', parseFloat(this.value), {priority: 'event'})",
+              input_id
+            )
+          )
+        }
+      ),
+      spec$col_def_options %||% list()
+    )
   )
 }
 
@@ -564,7 +768,9 @@ make_number_col_def <- function(spec, annotations, row_id, ns) {
 #' group is gated as a unit via its wrapping `<div>`.
 #'
 #' @param spec `list`. A single col_spec with `type = "radio"`. Requires
-#'   `choices`: a named character vector. Optionally includes `gates`.
+#'   `choices`: a named character vector. Optionally includes `gates`. Accepts
+#'   an optional `col_def_options` list of additional [reactable::colDef()]
+#'   arguments. `cell` may not be included in `col_def_options`.
 #' @param annotations `reactive`. The annotations reactiveVal from the parent
 #'   module server.
 #' @param row_id `character(1)`. Name of the ID column.
@@ -578,45 +784,51 @@ make_number_col_def <- function(spec, annotations, row_id, ns) {
 #'
 #' @noRd
 make_radio_col_def <- function(spec, annotations, row_id, ns) {
-  colDef(
-    name  = spec$label %||% spec$name,
-    width = spec$width,
-    cell  = function(value, index) {
-      ann      <- annotations()
-      id_value <- ann[[row_id]][index]
-      group_id <- ns(paste0(spec$name, "_", id_value))
-      current  <- ann[[spec$name]][index]
-      open     <- gate_is_open(spec, ann, index)
-      gb_id    <- gated_by_id(spec, ns, id_value)
+  do.call(
+    colDef,
+    c(
+      list(
+        name = spec$label %||% spec$name,
+        width = spec$width,
+        cell = function(value, index) {
+          ann <- annotations()
+          id_value <- ann[[row_id]][index]
+          group_id <- ns(paste0(spec$name, "_", id_value))
+          current <- ann[[spec$name]][index]
+          open <- gate_is_open(spec, ann, index)
+          gb_id <- gated_by_id(spec, ns, id_value)
 
-      radio_buttons <- map(names(spec$choices), function(label) {
-        val    <- spec$choices[[label]]
-        btn_id <- paste0(group_id, "_", val)
-        tags$label(
-          style = "display: block; font-weight: normal;",
-          tags$input(
-            type     = "radio",
-            id       = btn_id,
-            name     = group_id,
-            value    = val,
-            checked  = if (identical(current, val)) "checked" else NULL,
-            onchange = sprintf(
-              "Shiny.setInputValue('%s', this.value, {priority: 'event'})",
-              group_id
+          radio_buttons <- map(names(spec$choices), function(label) {
+            val <- spec$choices[[label]]
+            btn_id <- paste0(group_id, "_", val)
+            tags$label(
+              style = "display: block; font-weight: normal;",
+              tags$input(
+                type = "radio",
+                id = btn_id,
+                name = group_id,
+                value = val,
+                checked = if (identical(current, val)) "checked" else NULL,
+                onchange = sprintf(
+                  "Shiny.setInputValue('%s', this.value, {priority: 'event'})",
+                  group_id
+                )
+              ),
+              paste0(" ", label)
             )
-          ),
-          paste0(" ", label)
-        )
-      })
+          })
 
-      # Gate the entire group as a unit via the wrapping div — simpler than
-      # disabling each individual radio input
-      tags$div(
-        style           = gated_style(open),
-        `data-gated-by` = gb_id,
-        radio_buttons
-      )
-    }
+          # Gate the entire group as a unit via the wrapping div — simpler than
+          # disabling each individual radio input
+          tags$div(
+            style = gated_style(open),
+            `data-gated-by` = gb_id,
+            radio_buttons
+          )
+        }
+      ),
+      spec$col_def_options %||% list()
+    )
   )
 }
 
@@ -626,13 +838,28 @@ make_radio_col_def <- function(spec, annotations, row_id, ns) {
 #' Routes each column specification to the correct `make_*_col_def()`
 #' function based on its `type` field.
 #'
+#' Supported types:
+#' \describe{
+#'   \item{`display`}{Read-only cell sourced from source_data. `cell` may
+#'     be passed via `col_def_options` as a custom renderer.}
+#'   \item{`clickable_display`}{Like `display`, but the cell is wrapped in
+#'     a clickable `<div>` that toggles the checkbox named in `toggles`.}
+#'   \item{`select`}{Dropdown input.}
+#'   \item{`checkbox`}{Checkbox input. May act as a gate for other columns.}
+#'   \item{`text`}{Free-text input.}
+#'   \item{`number`}{Numeric input.}
+#'   \item{`radio`}{Radio button group.}
+#'   \item{`text_checkbox`}{Combined clickable-text + checkbox, sourced from
+#'     a display column named in `display_col`.}
+#' }
+#'
 #' @param spec `list`. A single column specification.
 #' @param annotations `reactive`. The annotations reactiveVal. Ignored for
+#'   plain display columns.
+#' @param row_id `character(1)`. Name of the ID column. Ignored for plain
 #'   display columns.
-#' @param row_id `character(1)`. Name of the ID column. Ignored for display
-#'   columns.
-#' @param ns `function`. The module namespace function. Ignored for display
-#'   columns.
+#' @param ns `function`. The module namespace function. Ignored for plain
+#'   display columns.
 #' @param source_data `reactive` or `NULL`. Required only for
 #'   `type = "text_checkbox"`, which needs it to look up the display text.
 #'   Safely ignored for all other types.
@@ -640,15 +867,34 @@ make_radio_col_def <- function(spec, annotations, row_id, ns) {
 #' @return A [reactable::colDef()] object.
 #'
 #' @noRd
-make_input_col_def <- function(spec, annotations, row_id, ns, source_data = NULL) {
-  switch(spec$type,
-    display       = make_display_col_def(spec),
-    select        = make_select_col_def(spec,        annotations, row_id, ns),
-    checkbox      = make_checkbox_col_def(spec,      annotations, row_id, ns),
-    text          = make_text_col_def(spec,          annotations, row_id, ns),
-    number        = make_number_col_def(spec,        annotations, row_id, ns),
-    radio         = make_radio_col_def(spec,         annotations, row_id, ns),
-    text_checkbox = make_text_checkbox_col_def(spec, annotations, source_data, row_id, ns),
+make_input_col_def <- function(
+  spec,
+  annotations,
+  row_id,
+  ns,
+  source_data = NULL
+) {
+  switch(
+    spec$type,
+    display = make_display_col_def(spec),
+    clickable_display = make_clickable_display_col_def(
+      spec,
+      annotations,
+      row_id,
+      ns
+    ),
+    select = make_select_col_def(spec, annotations, row_id, ns),
+    checkbox = make_checkbox_col_def(spec, annotations, row_id, ns),
+    text = make_text_col_def(spec, annotations, row_id, ns),
+    number = make_number_col_def(spec, annotations, row_id, ns),
+    radio = make_radio_col_def(spec, annotations, row_id, ns),
+    text_checkbox = make_text_checkbox_col_def(
+      spec,
+      annotations,
+      source_data,
+      row_id,
+      ns
+    ),
     stop(sprintf("Unknown column type: '%s'", spec$type))
   )
 }

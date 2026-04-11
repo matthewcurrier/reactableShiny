@@ -1,0 +1,125 @@
+---
+title: "Annotator Table"
+format: html
+server: shiny
+---
+```{r}
+#| label: setup
+#| include: false
+
+library(here)
+library(arrow)
+library(shiny)
+library(bslib)
+library(reactable)
+library(dplyr)
+library(purrr)
+
+source(here("R", "mod_annotator_table.R"))
+source(here("R", "utils_annotator.R"))
+source(here("R", "themes.R"))
+
+milestones <- read_parquet(here("inst", "datasets", "df_developmental_milestones.parquet"))
+
+stopifnot(!anyDuplicated(milestones$id))
+```
+```{css}
+.breakout {
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 1rem;
+}
+
+.rt-td,
+.rt-th {
+  vertical-align: middle !important;
+  padding: 6px 10px !important;
+}
+
+.card {
+  margin-bottom: 1.25rem;
+  border: 1px solid #dee2e6;
+}
+
+.card-header {
+  font-weight: 600;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.form-control[type="text"] {
+  font-size: 0.875rem;
+  padding: 2px 6px;
+  height: auto;
+}
+
+.form-control::placeholder {
+  color: #adb5bd;
+}
+```
+```{r}
+#| label: col-specs
+
+col_specs <- list(
+  list(name = "id",        type = "display",  label = "ID",        width = 60),
+  list(name = "age",       type = "display",  label = "Age",       width = 110),
+  list(name = "category",  type = "display",  label = "Category",  width = 180),
+  list(name = "milestone", type = "display",  label = "Milestone", width = 420),
+  list(name = "met",       type = "checkbox", label = "Met?",      width = 60),
+  list(name = "notes",     type = "text",     label = "Notes",
+       placeholder = "Short note...",          width = 200)
+)
+```
+```{r}
+#| label: ui
+#| panel: fill
+
+ui <- htmltools::div(
+  class = "breakout",
+
+  card(
+    card_header("Developmental Milestones"),
+    card_body(
+      annotator_table_ui("milestones")
+    )
+  ),
+
+  card(
+    card_header("Annotations so far"),
+    card_body(
+      tableOutput("annotations_out")
+    )
+  )
+)
+
+ui
+```
+```{r}
+#| label: server
+#| context: server
+
+source_data <- reactive(milestones)
+
+annotations <- annotator_table_server(
+  id          = "milestones",
+  source_data = source_data,
+  row_id      = "id",
+  col_specs   = col_specs
+)
+
+output$annotations_out <- renderTable({
+  ann <- annotations()
+
+  if (nrow(ann) == 0) {
+    return(data.frame(Message = "No milestones annotated yet."))
+  }
+
+  purrr::reduce(
+    list(ann, milestones),
+    ~ dplyr::left_join(.x, .y, by = "id")
+  ) |>
+    dplyr::select(id, age, category, milestone, met, notes)
+})
+```
