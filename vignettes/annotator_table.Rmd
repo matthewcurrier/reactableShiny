@@ -31,9 +31,13 @@ A few things worth knowing:
 
 Attach the UI placeholder with `annotator_table_ui()` and start the server logic with `annotator_table_server()`. The server function returns a reactive that you can observe or pass downstream.
 
-```r
+
+
+
+```{r example}
 library(shiny)
 library(bslib)
+library(reactableShiny)
 
 col_specs <- list(
   list(name = "car",      type = "display",  label = "Car"),
@@ -92,7 +96,7 @@ Every column type also accepts an optional `label` (shown as the column header; 
 
 Use `gates` to make one checkbox control whether other inputs in the same row are interactive. This is useful when a "flag this row" checkbox should unlock additional detail fields.
 
-```r
+```{r specs}
 col_specs <- list(
   list(name = "car",      type = "display",  label = "Car"),
   list(name = "flag",     type = "checkbox", label = "Flag for review?"),
@@ -115,7 +119,7 @@ library(purrr)
 library(here)
 library(reactable)
 library(reactable.extras)
-library(reactable.shiny)
+library(reactableShiny)
 source(here("R", "utils_annotator.R"))
 source(here("R", "mod_annotator_table.R"))
 source(here("R", "themes.R"))
@@ -182,7 +186,7 @@ milestones <- read_parquet(here("inst", "datasets", "df_developmental_milestones
 ```{r app, echo=FALSE}
 library(reactable)
 library(reactable.extras)
-library(reactable.shiny)
+library(reactableShiny)
 
 
 # chunk: col_specs

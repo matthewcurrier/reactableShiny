@@ -67,12 +67,12 @@ col_specs <- list(
   list(
     name    = "fruit",
     label   = "Fruit",
-    choices = c("" = "", "Apple" = "apple", "Banana" = "banana")
+    choices = c("None" = "", "Apple" = "apple", "Banana" = "banana")
   ),
   list(
     name    = "colour",
     label   = "Colour",
-    choices = c("" = "", "Red" = "red", "Yellow" = "yellow")
+    choices = c("None" = "", "Red" = "red", "Yellow" = "yellow")
   )
 )
 

@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# reactable.shiny
+# reactableShiny
 
 <!-- badges: start -->
 
@@ -9,7 +9,7 @@
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 <!-- badges: end -->
 
-The goal of reactable.shiny is to combine the unique features of the
+The goal of reactableShiny is to combine the unique features of the
 reactable package with shiny inputs so that users can more easily write
 data to databases.
 
@@ -20,5 +20,5 @@ You can install the development version of reactable.shiny from
 
 ``` r
 # install.packages("pak")
-pak::pak("matthewcurrier/reactable.shiny")
+pak::pak("matthewcurrier/reactableShiny")
 ```

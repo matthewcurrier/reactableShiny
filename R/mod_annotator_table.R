@@ -32,7 +32,7 @@
 #'
 #' @export
 annotator_table_ui <- function(id) {
-  reactableOutput(NS(id, "table"))
+  reactableOutput(shiny::NS(id, "table"))
 }
 
 

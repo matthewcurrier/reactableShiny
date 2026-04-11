@@ -94,7 +94,7 @@ library(shiny)
 library(bslib)
 library(purrr)
 library(reactable)
-library(reactable.shiny)
+library(reactableShiny)
 
 home_occupants <- c(
   "mother",
@@ -214,7 +214,7 @@ If, however, you want to disallow duplicates, you can do that as well.
 ```{r}
 library(shiny)
 library(bslib)
-library(reactable.shiny)
+library(reactableShiny)
 
 home_occupants <- c("mother", "father", "grandmother", "grandfather", "sibling", "sibling (male)", "sibling (female)", "step-mother", "step-father", "partner", "spouse")
 
@@ -273,7 +273,7 @@ server <- function(input, output, session) {
 ```{r}
 library(shiny)
 library(bslib)
-library(reactable.shiny)
+library(reactableShiny)
 
 
 home_occupants <- c("mother",
