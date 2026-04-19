@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/articles/special-files.html
 
 library(testthat)
-library(reactable.shiny)
+library(reactableShiny)
 
-test_check("reactable.shiny")
+test_check("reactableShiny")

@@ -185,7 +185,7 @@ make_options <- function(choices, current_value) {
 #' @return A named `character` vector or named `list` of named `character`
 #'   vectors — the same format as the `choices` field in a column spec.
 #'
-#' @seealso [make_col_def()]
+#' @seealso [make_flexible_col_def()]
 #'
 #' @noRd
 resolve_choices <- function(spec, data, index) {
@@ -200,7 +200,7 @@ resolve_choices <- function(spec, data, index) {
 }
 
 
-#' Build a reactable column definition for one col_spec entry
+#' Build a reactable column definition for a select col_spec entry
 #'
 #' Produces a [reactable::colDef()] whose `cell` renderer draws an HTML
 #' `<select>` dropdown. The dropdown is wired to Shiny via an `onchange`
@@ -223,7 +223,7 @@ resolve_choices <- function(spec, data, index) {
 #' @importFrom shiny tags
 #'
 #' @noRd
-make_col_def <- function(spec, table_data, ns) {
+make_flexible_select_col_def <- function(spec, table_data, ns) {
   colDef(
     name = spec$label,
     width = spec$width,
@@ -236,14 +236,139 @@ make_col_def <- function(spec, table_data, ns) {
       tags$select(
         id = input_id,
         class = "form-control",
-        style = if (!nzchar(value)) "color: #6c757d;" else NULL,
+        style = if (!nzchar(value)) "color: #6c757d;" else "color: #000000;",
         onchange = sprintf(
-          "this.style.color = this.value === '' ? '#6c757d' : '';
-           Shiny.setInputValue('%s', this.value)",
+          "this.style.color = this.value === '' ? '#6c757d' : '#000000';
+   Shiny.setInputValue('%s', this.value)",
           input_id
         ),
         make_options(choices, value)
       )
     }
+  )
+}
+
+
+#' Build a reactable column definition for a text input col_spec
+#'
+#' Renders a free-text `<input type="text">` in each cell. The value is
+#' reported to Shiny via an `onchange` handler using `{priority: 'event'}`
+#' so every keystroke-then-blur is captured reliably.
+#'
+#' @param spec `list`. A single col_spec with `type = "text"`. Accepts an
+#'   optional `placeholder` field. `width` is forwarded to [reactable::colDef()].
+#' @param table_data `reactive`. The `table_data` reactive from the parent
+#'   module server.
+#' @param ns `function`. The module namespace function.
+#'
+#' @return A [reactable::colDef()] object.
+#'
+#' @importFrom reactable colDef
+#' @importFrom shiny tags
+#'
+#' @noRd
+make_flexible_text_col_def <- function(spec, table_data, ns) {
+  colDef(
+    name = spec$label,
+    width = spec$width,
+    cell = function(value, index) {
+      data <- table_data()
+      row_id <- data$id[index]
+      input_id <- ns(paste0(spec$name, "_", row_id))
+
+      tags$input(
+        type = "text",
+        id = input_id,
+        class = "form-control ft-text-input",
+        value = if (!is.na(value) && nzchar(value)) value else NULL,
+        placeholder = spec$placeholder %||% "",
+        onchange = sprintf(
+          "Shiny.setInputValue('%s', this.value, {priority: 'event'})",
+          input_id
+        )
+      )
+    }
+  )
+}
+
+
+#' Build a reactable column definition for a date input col_spec
+#'
+#' Renders a native `<input type="date">` in each cell. The value is always
+#' a character string in `"YYYY-MM-DD"` format when non-empty, which is what
+#' `as.Date()` expects. Optional `min` and `max` fields in the spec constrain
+#' the browser's date picker.
+#'
+#' @param spec `list`. A single col_spec with `type = "date"`. Accepts
+#'   optional `min` and `max` fields (character strings in `"YYYY-MM-DD"`
+#'   format). `width` is forwarded to [reactable::colDef()].
+#' @param table_data `reactive`. The `table_data` reactive from the parent
+#'   module server.
+#' @param ns `function`. The module namespace function.
+#'
+#' @return A [reactable::colDef()] object.
+#'
+#' @importFrom reactable colDef
+#' @importFrom shiny tags
+#'
+#' @noRd
+make_flexible_date_col_def <- function(spec, table_data, ns) {
+  colDef(
+    name = spec$label,
+    width = spec$width,
+    cell = function(value, index) {
+      data <- table_data()
+      row_id <- data$id[index]
+      input_id <- ns(paste0(spec$name, "_", row_id))
+
+      tags$input(
+        type = "date",
+        id = input_id,
+        class = "form-control ft-date-input",
+        value = if (!is.na(value) && nzchar(value)) value else NULL,
+        min = spec$min %||% NULL,
+        max = spec$max %||% NULL,
+        onchange = sprintf(
+          "Shiny.setInputValue('%s', this.value, {priority: 'event'})",
+          input_id
+        )
+      )
+    }
+  )
+}
+
+
+#' Dispatch a col_spec to its appropriate colDef builder
+#'
+#' Routes each column specification to the correct `make_flexible_*_col_def()`
+#' function based on its `type` field. Defaults to `"select"` when `type`
+#' is absent so existing col_specs require no migration.
+#'
+#' Supported types:
+#' \describe{
+#'   \item{`"select"`}{Dropdown — see [make_flexible_select_col_def()].}
+#'   \item{`"text"`}{Free-text input — see [make_flexible_text_col_def()].}
+#'   \item{`"date"`}{Date picker — see [make_flexible_date_col_def()].}
+#' }
+#'
+#' @param spec `list`. A single column specification from `col_specs`.
+#' @param table_data `reactive`. The `table_data` reactive from the parent
+#'   module server.
+#' @param ns `function`. The module namespace function.
+#'
+#' @return A [reactable::colDef()] object.
+#'
+#' @noRd
+make_flexible_col_def <- function(spec, table_data, ns) {
+  type <- spec$type %||% "select"
+  switch(
+    type,
+    select = make_flexible_select_col_def(spec, table_data, ns),
+    text = make_flexible_text_col_def(spec, table_data, ns),
+    date = make_flexible_date_col_def(spec, table_data, ns),
+    stop(sprintf(
+      "Unknown column type: '%s'. Must be one of: 'select', 'text', 'date'.",
+      type
+    ))
   )
 }

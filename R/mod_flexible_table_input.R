@@ -102,9 +102,10 @@ flexible_table_ui <- function(id) {
 #'
 #' @seealso [flexible_table_ui()]
 #'
-#' @importFrom shiny moduleServer reactiveVal observeEvent observe reactive
+#' @importFrom shiny moduleServer reactiveVal observeEvent observe reactive icon
+#'   tags
 #' @importFrom reactable reactable colDef renderReactable
-#' @importFrom dplyr filter select distinct if_all everything
+#' @importFrom dplyr filter select distinct if_all if_any everything
 #' @importFrom purrr map map_chr walk set_names
 #'
 #' @examples
@@ -313,7 +314,7 @@ flexible_table_server <- function(
       force(reactable_remount_trigger()) # take dependency so reset triggers a clean full render
       data <- table_data()
 
-      spec_cols <- map(col_specs, make_col_def, table_data, ns) |>
+      spec_cols <- map(col_specs, make_flexible_col_def, table_data, ns) |>
         set_names(map_chr(col_specs, "name"))
 
       all_cols <- c(
@@ -333,7 +334,7 @@ flexible_table_server <- function(
 
     reactive({
       data <- table_data() |>
-        select(-id, -delete) |>
+        dplyr::select(-"id", -"delete") |>
         filter(if_any(everything(), ~ !is.null(.x) & !is.na(.x) & .x != ""))
 
       if (duplicates_allowed) data else distinct(data)

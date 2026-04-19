@@ -594,6 +594,7 @@ make_checkbox_col_def <- function(spec, annotations, row_id, ns) {
 #'
 #' @noRd
 make_select_col_def <- function(spec, annotations, row_id, ns) {
+  force(ns)
   do.call(
     colDef,
     c(
@@ -670,6 +671,7 @@ make_select_col_def <- function(spec, annotations, row_id, ns) {
 #'
 #' @noRd
 make_text_col_def <- function(spec, annotations, row_id, ns) {
+  force(ns)
   do.call(
     colDef,
     c(
@@ -726,6 +728,7 @@ make_text_col_def <- function(spec, annotations, row_id, ns) {
 #'
 #' @noRd
 make_number_col_def <- function(spec, annotations, row_id, ns) {
+  force(ns)
   do.call(
     colDef,
     c(
@@ -784,6 +787,7 @@ make_number_col_def <- function(spec, annotations, row_id, ns) {
 #'
 #' @noRd
 make_radio_col_def <- function(spec, annotations, row_id, ns) {
+  force(ns)
   do.call(
     colDef,
     c(
@@ -874,6 +878,7 @@ make_input_col_def <- function(
   ns,
   source_data = NULL
 ) {
+  force(ns)
   switch(
     spec$type,
     display = make_display_col_def(spec),

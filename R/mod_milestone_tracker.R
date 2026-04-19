@@ -23,7 +23,7 @@
 #' @param id `character(1)`. Shiny module namespace ID.
 #'
 #' @return A [bslib::layout_columns()] UI element.
-#'
+#' @importFrom shiny textOutput uiOutput
 #' @export
 milestone_tracker_ui <- function(id) {
   ns <- NS(id)
@@ -90,6 +90,7 @@ milestone_tracker_ui <- function(id) {
 #' @importFrom reactable reactable colDef reactableTheme renderReactable
 #'   reactableOutput getReactableState JS
 #' @importFrom htmltools tags
+#' @importFrom shiny textOutput uiOutput
 #' @importFrom bslib layout_columns card card_header
 #'
 #' @export

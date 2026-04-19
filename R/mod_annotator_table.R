@@ -76,6 +76,12 @@ annotator_table_ui <- function(id) {
 #'
 #' @param reactable_theme A [reactable::reactableTheme()] object applied to
 #'   the rendered table. Defaults to `theme_bare`.
+#' @param reactable_options `list`. Additional arguments passed to
+#'   [reactable::reactable()] via [base::do.call()].
+#'
+#' @param initial_values `reactive`. A reactive returning a data frame of
+#'   pre-existing annotation values to seed the module. Defaults to
+#'   `reactive(NULL)`.
 #'
 #' @return A [shiny::reactive()] returning a data frame with the `row_id`
 #'   column and all input annotation columns, filtered to rows where at least
@@ -127,7 +133,8 @@ annotator_table_server <- function(
   row_id,
   col_specs,
   reactable_theme = theme_bare,
-  reactable_options = list()
+  reactable_options = list(),
+  initial_values = reactive(NULL)
 ) {
   if (is.null(col_specs) || length(col_specs) == 0) {
     stop("`col_specs` must be a non-empty list of column specifications.")
@@ -155,8 +162,19 @@ annotator_table_server <- function(
     # due to a filter and then reappears, its values are restored.
     # -------------------------------------------------------------------------
 
+    starting_vals <- isolate(initial_values())
+
     annotations <- reactiveVal(
-      initial_annotations(isolate(source_data()), row_id, input_specs)
+      if (!is.null(starting_vals) && nrow(starting_vals) > 0) {
+        merge_annotations(
+          isolate(source_data()),
+          row_id,
+          input_specs,
+          starting_vals
+        )
+      } else {
+        initial_annotations(isolate(source_data()), row_id, input_specs)
+      }
     )
 
     # -------------------------------------------------------------------------

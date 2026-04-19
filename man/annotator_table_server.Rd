@@ -10,7 +10,8 @@ annotator_table_server(
   row_id,
   col_specs,
   reactable_theme = theme_bare,
-  reactable_options = list()
+  reactable_options = list(),
+  initial_values = reactive(NULL)
 )
 }
 \arguments{
@@ -42,6 +43,13 @@ All types accept an optional `label` (defaults to `name`) and optional
 
 \item{reactable_theme}{A [reactable::reactableTheme()] object applied to
 the rendered table. Defaults to `theme_bare`.}
+
+\item{reactable_options}{`list`. Additional arguments passed to
+[reactable::reactable()] via [base::do.call()].}
+
+\item{initial_values}{`reactive`. A reactive returning a data frame of
+pre-existing annotation values to seed the module. Defaults to
+`reactive(NULL)`.}
 }
 \value{
 A [shiny::reactive()] returning a data frame with the `row_id`

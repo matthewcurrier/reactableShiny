@@ -116,13 +116,9 @@ Here, **Reason** and **Notes** are greyed out until **Flag for review?** is chec
 ```{r module, echo=FALSE}
 library(dplyr)
 library(purrr)
-library(here)
 library(reactable)
 library(reactable.extras)
 library(reactableShiny)
-source(here("R", "utils_annotator.R"))
-source(here("R", "mod_annotator_table.R"))
-source(here("R", "themes.R"))
 ```
 
 
@@ -171,14 +167,10 @@ source(here("R", "themes.R"))
 
 
 ```{r load, echo=FALSE}
-library(here)
-library(arrow)
-library(dplyr)
 
-milestones <- read_parquet(here("inst", "datasets", "df_developmental_milestones.parquet"))
-
-# str(milestones)
-# glimpse(milestones)
+milestones <- arrow::read_parquet(
+  system.file("datasets/df_developmental_milestones.parquet", package = "reactableShiny")
+)
 
 ```
 
@@ -187,6 +179,8 @@ milestones <- read_parquet(here("inst", "datasets", "df_developmental_milestones
 library(reactable)
 library(reactable.extras)
 library(reactableShiny)
+library(dplyr)
+
 
 
 # chunk: col_specs
