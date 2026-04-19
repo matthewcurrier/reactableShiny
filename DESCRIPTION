@@ -1,7 +1,7 @@
 Package: reactableShiny
 Type: Package
 Title: Extends reactable tables for use with shiny (ie uploading data)
-Version: 0.1.8
+Version: 0.1.9
 Authors@R: c(
     person(
       "Matthew", "Currier",
@@ -17,17 +17,21 @@ LazyData: true
 Imports: 
     bsicons,
     bslib,
+    config,
     dplyr,
     htmltools,
     purrr,
     reactable,
-    shiny,
-    shinyjs
+    shiny
 RoxygenNote: 7.3.3
 Suggests: 
     testthat (>= 3.0.0),
     knitr,
-    rmarkdown
+    rmarkdown,
+    here,
+    tibble,
+    arrow,
+    reactable.extras
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Config/Needs/website: rmarkdown
