@@ -1,7 +1,7 @@
 Package: reactableShiny
 Type: Package
 Title: Extends reactable tables for use with shiny (ie uploading data)
-Version: 0.1.10
+Version: 0.1.11
 Authors@R: c(
     person(
       "Matthew", "Currier",
