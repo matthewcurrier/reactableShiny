@@ -1,0 +1,128 @@
+/* =============================================================================
+   custom.css
+   Place in inst/app/www/ and reference with:
+     tags$head(tags$link(rel = "stylesheet", href = "custom.css"))
+   or via golem::add_resource_path() + app_sys().
+   ============================================================================= */
+
+/* -----------------------------------------------------------------------------
+   .rs-badge
+   Coloured category badge used in reactable cells.
+   Background and text colour are applied inline by make_badge_renderer()
+   because they are data-driven. All structural constants live here.
+   ----------------------------------------------------------------------------- */
+.rs-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* -----------------------------------------------------------------------------
+   .rs-selection-summary
+   Container div rendered above Card 1 listing per-group selection counts.
+   ----------------------------------------------------------------------------- */
+.rs-selection-summary {
+  padding: 4px 8px 8px 8px;
+}
+
+/* -----------------------------------------------------------------------------
+   .rs-selection-summary-badge
+   Individual group-count badge inside .rs-selection-summary.
+   Background and text colour are applied inline and derived from badge_colors.
+   ----------------------------------------------------------------------------- */
+.rs-selection-summary-badge {
+  display: inline-block;
+  margin: 2px 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* -----------------------------------------------------------------------------
+   .rs-empty-state
+   Centred prompt shown in Card 2 when no rows are selected.
+   ----------------------------------------------------------------------------- */
+.rs-empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: #6c757d;
+  font-size: 14px;
+}
+
+
+/* =============================================================================
+   custom.css
+   Styling for reactableShiny modules.
+
+   Place this file at inst/app/www/custom.css and load it in your app UI with:
+
+       tags$head(tags$link(rel = "stylesheet", type = "text/css", href = "custom.css"))
+
+   Or, in a golem app, via app_ui() using:
+
+       golem_add_external_resources()   # if custom.css is in inst/app/www/
+
+   ============================================================================= */
+
+
+/* =============================================================================
+   Enrichment gate — annotator_enriched module
+   =============================================================================
+
+   Every enrichment input is wrapped in <div class="enrichment-gate">.
+   The gate is closed (greyed out, non-interactive) by default and opens only
+   when its parent row carries aria-selected="true".
+
+   reactable sets aria-selected="true" on the <div role="row"> element of a
+   selected row. Because CSS handles the transition, no Shiny round-trip or
+   table re-render is needed when the user clicks to select or deselect a row.
+
+   The transition makes the state change feel instant rather than jarring.
+   ============================================================================= */
+
+.enrichment-gate {
+  opacity: 0.35;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+/* Scoped to .rt-tr so we only target reactable rows, not other aria-selected
+   elements that may exist elsewhere on the page. */
+.rt-tr[aria-selected="true"] .enrichment-gate {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+
+/* =============================================================================
+   Enrichment input sizing
+   =============================================================================
+
+   form-control-sm is Bootstrap's small variant but reactable cells are
+   compact; tighten padding further so the inputs sit flush in the cell.
+   ============================================================================= */
+
+.enrichment-gate .form-control-sm {
+  padding: 2px 6px;
+  font-size: 0.8rem;
+  height: auto;
+  min-height: 28px;
+}
+
+
+/* =============================================================================
+   Select placeholder colour
+   =============================================================================
+
+   When a select input has no value selected (value === ""), we render it
+   with color: #6c757d via an inline style set in the onchange handler.
+   This rule ensures the colour is also correct on initial load when the
+   server sets style="color: #6c757d;" on the <select> element.
+   ============================================================================= */
+
+.enrichment-gate select option[value=""] {
+  color: #6c757d;
+}

@@ -21,14 +21,19 @@
 #' annotation table (or an empty-state prompt).
 #'
 #' @param id `character(1)`. Shiny module namespace ID.
+#' @param col_widths `numeric(2)`. Bootstrap column widths for the two cards,
+#'   passed directly to [bslib::layout_columns()]. Defaults to `c(6, 6)`
+#'   for an equal split. Use e.g. `c(4, 8)` when Card 2 has many columns.
 #'
 #' @return A [bslib::layout_columns()] UI element.
-#' @importFrom shiny textOutput uiOutput
+#' @importFrom shiny NS textOutput uiOutput
+#' @importFrom reactable reactableOutput
+#' @importFrom bslib layout_columns card card_header
 #' @export
-milestone_tracker_ui <- function(id) {
+milestone_tracker_ui <- function(id, col_widths = c(6, 6)) {
   ns <- NS(id)
   bslib::layout_columns(
-    col_widths = c(6, 6),
+    col_widths = col_widths,
     bslib::card(
       bslib::card_header(textOutput(ns("card1_title"), inline = TRUE)),
       uiOutput(ns("selection_summary")),
@@ -66,12 +71,17 @@ milestone_tracker_ui <- function(id) {
 #'
 #' @param badge_colors Named list or `NULL`. Maps badge values to
 #'   `list(bg = "#hex", text = "#hex")` colour specs. Required when
-#'   `badge_col` is not `NULL`.
+#'   `badge_col` is not `NULL`. Also used to colour the per-group selection
+#'   summary badges in Card 1 — when a group name matches a key in
+#'   `badge_colors`, that colour is applied; otherwise a neutral green
+#'   fallback is used.
 #'
 #' @param annotation_col_specs `list`. Full col_specs list passed to
 #'   [annotator_table_server()] for Card 2. Include display col_specs for
 #'   columns you want to show from the selected data, followed by input
 #'   col_specs for annotation fields (select, checkbox, text, etc.).
+#'   Use [make_badge_renderer()] to obtain a cell renderer consistent with
+#'   Card 1 for any display col_spec that shows a badge column.
 #'
 #' @param card1_title `character(1)`. Header text for Card 1.
 #' @param card2_title `character(1)`. Header text for Card 2.
@@ -81,16 +91,22 @@ milestone_tracker_ui <- function(id) {
 #'   column. Defaults to `item_col`.
 #' @param count_label `character(1)`. Suffix used in the aggregate row count
 #'   (e.g. `"milestones"` → `"5 milestones"`).
+#' @param card1_reactable_options `list`. Additional arguments passed to
+#'   [reactable::reactable()] for Card 1 via [base::do.call()]. Do not
+#'   include `data`, `groupBy`, `selection`, `onClick`, or `columns` — these
+#'   are owned by the module. Useful for overriding `defaultPageSize`,
+#'   `sortable`, `theme`, etc.
 #'
 #' @return A [shiny::reactive()] returning a data frame of row IDs and
 #'   annotation values for rows where at least one input has been touched.
 #'   Passes through the return value of [annotator_table_server()].
 #'
-#' @importFrom shiny moduleServer NS reactive renderText renderUI debounce
+#' @importFrom shiny moduleServer NS reactive reactiveVal renderText renderUI
+#'   debounce
 #' @importFrom reactable reactable colDef reactableTheme renderReactable
 #'   reactableOutput getReactableState JS
 #' @importFrom htmltools tags
-#' @importFrom shiny textOutput uiOutput
+#' @importFrom purrr map
 #' @importFrom bslib layout_columns card card_header
 #'
 #' @export
@@ -108,40 +124,29 @@ milestone_tracker_server <- function(
   card2_title = "Annotations",
   group_label = NULL,
   item_label = NULL,
-  count_label = "items"
+  count_label = "items",
+  card1_reactable_options = list()
 ) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    # %||% is defined locally here until a package-level definition is added
+    # to a shared utils file and imported via @importFrom.
+    `%||%` <- function(x, y) if (is.null(x)) y else x
 
     output$card1_title <- renderText(card1_title)
     output$card2_title <- renderText(card2_title)
 
     # -----------------------------------------------------------------------
-    # Helpers
+    # Badge renderer
+    #
+    # make_badge_renderer() is exported from utils_annotator.R. Using it here
+    # keeps Card 1 and Card 2 badge appearances in sync when the caller passes
+    # the same renderer to their annotation_col_specs.
     # -----------------------------------------------------------------------
 
-    `%||%` <- function(x, y) if (is.null(x)) y else x
-
-    make_badge <- if (!is.null(badge_col) && !is.null(badge_colors)) {
-      function(value) {
-        color <- badge_colors[[value]] %||%
-          list(bg = "#F1EFE8", text = "#444441")
-        tags$span(
-          style = paste0(
-            "background:",
-            color$bg,
-            ";",
-            "color:",
-            color$text,
-            ";",
-            "padding: 2px 8px;",
-            "border-radius: 4px;",
-            "font-size: 12px;",
-            "font-weight: 500;"
-          ),
-          value
-        )
-      }
+    badge_renderer <- if (!is.null(badge_col) && !is.null(badge_colors)) {
+      make_badge_renderer(badge_colors)
     } else {
       NULL
     }
@@ -197,7 +202,7 @@ milestone_tracker_server <- function(
         col_defs[[badge_col]] <- colDef(
           name = badge_col,
           minWidth = 140,
-          cell = make_badge,
+          cell = badge_renderer,
           aggregate = JS(
             "function(values) { return [...new Set(values)].join(', '); }"
           )
@@ -215,12 +220,27 @@ milestone_tracker_server <- function(
         )
       )
 
-      reactable(
-        df,
+      # Arguments are split into two tiers:
+      #
+      #   fixed_args      — owned by the module; never overridable. Passing
+      #                     any of these in card1_reactable_options will cause
+      #                     do.call() to error with a duplicate argument,
+      #                     surfacing the mistake immediately.
+      #
+      #   overridable_defaults — sane defaults that callers may replace by
+      #                     including the same key in card1_reactable_options.
+      #                     modifyList() applies caller overrides on top of
+      #                     the defaults before c() assembles the final list,
+      #                     so each key appears exactly once.
+      fixed_args <- list(
+        data = df,
         groupBy = group_col,
         selection = "multiple",
         onClick = "select",
-        columns = col_defs,
+        columns = col_defs
+      )
+
+      overridable_defaults <- list(
         sortable = FALSE,
         highlight = TRUE,
         bordered = TRUE,
@@ -233,6 +253,11 @@ milestone_tracker_server <- function(
           ),
           rowStyle = list(cursor = "pointer")
         )
+      )
+
+      do.call(
+        reactable,
+        c(fixed_args, modifyList(overridable_defaults, card1_reactable_options))
       )
     })
 
@@ -257,8 +282,16 @@ milestone_tracker_server <- function(
     selected_data <- selected_data_raw |> debounce(300)
 
     # -----------------------------------------------------------------------
-    # Card 1 summary: per-group selection counts shown above the table
+    # Card 1 summary: per-group selection counts shown above the table.
+    #
+    # Colours are derived from badge_colors when the group name is a known
+    # key (e.g. when group_col is the same dimension as badge_col). When the
+    # key is absent — e.g. group_col is "age" and badge_colors keys are
+    # category names — a neutral green fallback is used so the summary
+    # remains legible without hard-coding a single colour for all groups.
     # -----------------------------------------------------------------------
+
+    summary_fallback <- list(bg = "#EAF3DE", text = "#27500A")
 
     output$selection_summary <- renderUI({
       sel <- selected_data()
@@ -267,19 +300,28 @@ milestone_tracker_server <- function(
       }
 
       counts <- sort(table(sel[[group_col]]))
-      badges <- lapply(names(counts), function(g) {
+
+      badges <- purrr::map(names(counts), function(g) {
+        color <- if (!is.null(badge_colors)) {
+          badge_colors[[g]] %||% summary_fallback
+        } else {
+          summary_fallback
+        }
         tags$span(
+          class = "rs-selection-summary-badge",
           style = paste0(
-            "display:inline-block; margin:2px 4px;",
-            "background:#EAF3DE; color:#27500A;",
-            "padding:2px 8px; border-radius:4px;",
-            "font-size:12px; font-weight:500;"
+            "background:",
+            color$bg,
+            ";",
+            "color:",
+            color$text,
+            ";"
           ),
           paste0(g, ": ", counts[[g]], " selected")
         )
       })
 
-      tags$div(style = "padding:4px 8px 8px 8px;", badges)
+      tags$div(class = "rs-selection-summary", badges)
     })
 
     # -----------------------------------------------------------------------
@@ -293,12 +335,7 @@ milestone_tracker_server <- function(
     output$annotation_area <- renderUI({
       if (nrow(selected_data()) == 0L) {
         tags$div(
-          style = paste0(
-            "padding: 2rem;",
-            "text-align: center;",
-            "color: #6c757d;",
-            "font-size: 14px;"
-          ),
+          class = "rs-empty-state",
           "Select items from the left panel to begin annotating."
         )
       } else {

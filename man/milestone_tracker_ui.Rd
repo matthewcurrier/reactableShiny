@@ -4,10 +4,14 @@
 \alias{milestone_tracker_ui}
 \title{Milestone Tracker — UI}
 \usage{
-milestone_tracker_ui(id)
+milestone_tracker_ui(id, col_widths = c(6, 6))
 }
 \arguments{
 \item{id}{`character(1)`. Shiny module namespace ID.}
+
+\item{col_widths}{`numeric(2)`. Bootstrap column widths for the two cards,
+passed directly to [bslib::layout_columns()]. Defaults to `c(6, 6)`
+for an equal split. Use e.g. `c(4, 8)` when Card 2 has many columns.}
 }
 \value{
 A [bslib::layout_columns()] UI element.

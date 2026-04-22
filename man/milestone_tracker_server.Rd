@@ -18,7 +18,8 @@ milestone_tracker_server(
   card2_title = "Annotations",
   group_label = NULL,
   item_label = NULL,
-  count_label = "items"
+  count_label = "items",
+  card1_reactable_options = list()
 )
 }
 \arguments{
@@ -44,12 +45,17 @@ badge in Card 1 (e.g. `"category"`). `NULL` disables badge rendering.}
 
 \item{badge_colors}{Named list or `NULL`. Maps badge values to
 `list(bg = "#hex", text = "#hex")` colour specs. Required when
-`badge_col` is not `NULL`.}
+`badge_col` is not `NULL`. Also used to colour the per-group selection
+summary badges in Card 1 — when a group name matches a key in
+`badge_colors`, that colour is applied; otherwise a neutral green
+fallback is used.}
 
 \item{annotation_col_specs}{`list`. Full col_specs list passed to
 [annotator_table_server()] for Card 2. Include display col_specs for
 columns you want to show from the selected data, followed by input
-col_specs for annotation fields (select, checkbox, text, etc.).}
+col_specs for annotation fields (select, checkbox, text, etc.).
+Use [make_badge_renderer()] to obtain a cell renderer consistent with
+Card 1 for any display col_spec that shows a badge column.}
 
 \item{card1_title}{`character(1)`. Header text for Card 1.}
 
@@ -63,6 +69,12 @@ column. Defaults to `item_col`.}
 
 \item{count_label}{`character(1)`. Suffix used in the aggregate row count
 (e.g. `"milestones"` → `"5 milestones"`).}
+
+\item{card1_reactable_options}{`list`. Additional arguments passed to
+[reactable::reactable()] for Card 1 via [base::do.call()]. Do not
+include `data`, `groupBy`, `selection`, `onClick`, or `columns` — these
+are owned by the module. Useful for overriding `defaultPageSize`,
+`sortable`, `theme`, etc.}
 }
 \value{
 A [shiny::reactive()] returning a data frame of row IDs and

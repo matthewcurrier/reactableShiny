@@ -346,15 +346,13 @@ gating_checkbox_onchange <- function(input_id) {
 #'
 #' @noRd
 make_display_col_def <- function(spec) {
+  base <- list(
+    name = spec$label %||% spec$name,
+    width = spec$width
+  )
   do.call(
     colDef,
-    c(
-      list(
-        name = spec$label %||% spec$name,
-        width = spec$width
-      ),
-      spec$col_def_options %||% list()
-    )
+    modifyList(base, spec$col_def_options %||% list())
   )
 }
 
