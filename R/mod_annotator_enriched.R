@@ -170,6 +170,22 @@ annotator_enriched_ui <- function(id) {
 #'       [reactable::colDef()].}
 #'   }
 #'
+#' @param initial_enrichments `data.frame` or `NULL`. A pre-populated
+#'   enrichments frame to seed the module's internal state on first render.
+#'   Must have the same structure as the frame produced by
+#'   [initial_enrichments_blank()]: a `row_id` column (character) followed by
+#'   one column per enrichment spec. Rows absent from `source_data` are
+#'   silently ignored; rows in `source_data` but absent here receive their
+#'   untouched defaults. Pass `NULL` (the default) to start with a fully blank
+#'   state. Typically constructed from a saved report's data frame via the
+#'   same dplyr pipeline used by the host module's `build_initial_*` helper.
+#'
+#' @param initial_selected `character`. A character vector of `row_id` values
+#'   that should appear as selected on first render. Defaults to
+#'   `character(0)` (nothing pre-selected). Values not present in
+#'   `source_data` are silently dropped. Used to restore checkbox state when
+#'   re-opening an existing report.
+#'
 #' @param selection `character(1)`. Either `"multiple"` (default) or
 #'   `"single"`.
 #'
@@ -202,6 +218,8 @@ annotator_enriched_server <- function(
   row_id,
   display_cols,
   enrich_specs,
+  initial_enrichments = NULL,
+  initial_selected = character(0),
   selection = "multiple",
   reactable_theme = theme_bare,
   reactable_options = list()
@@ -220,12 +238,36 @@ annotator_enriched_server <- function(
 
     # -------------------------------------------------------------------------
     # Reactive state
+    #
+    # initial_enrichments (the parameter) seeds the enrichments frame when the
+    # caller has pre-existing data to restore (e.g. re-opening a saved report).
+    # merge_enrichments is used rather than assigning the frame directly so
+    # that rows absent from initial_enrichments receive per-type defaults, and
+    # rows absent from source_data are safely ignored.
+    #
+    # initial_selected seeds the checkbox state. Values are coerced to
+    # character to match the type maintained by selected_ids throughout.
     # -------------------------------------------------------------------------
 
-    selected_ids <- shiny::reactiveVal(character(0))
+    seed_ids <- as.character(initial_selected)
+
+    selected_ids <- shiny::reactiveVal(seed_ids)
 
     enrichments <- shiny::reactiveVal(
-      initial_enrichments(shiny::isolate(source_data()), row_id, enrich_specs)
+      if (!is.null(initial_enrichments)) {
+        merge_enrichments(
+          shiny::isolate(source_data()),
+          row_id,
+          enrich_specs,
+          initial_enrichments
+        )
+      } else {
+        initial_enrichments_blank(
+          shiny::isolate(source_data()),
+          row_id,
+          enrich_specs
+        )
+      }
     )
 
     # Bumped when source_data changes — causes a full table re-render so new

@@ -74,7 +74,7 @@ default_enrichment_value <- function(spec) {
 #' @importFrom purrr map map_chr
 #'
 #' @noRd
-initial_enrichments <- function(source_data, row_id, enrich_specs) {
+initial_enrichments_blank <- function(source_data, row_id, enrich_specs) {
   id_values <- as.character(source_data[[row_id]])
 
   if (length(id_values) == 0) {
@@ -111,10 +111,10 @@ initial_enrichments <- function(source_data, row_id, enrich_specs) {
 #' @param row_id `character(1)`. Name of the ID column.
 #' @param enrich_specs `list`. Enrichment column specifications.
 #' @param existing `data.frame`. The current enrichments data frame, as
-#'   returned by a previous call to [initial_enrichments()] or
+#'   returned by a previous call to [initial_enrichments_blank()] or
 #'   [merge_enrichments()].
 #'
-#' @return A `data.frame` with the same structure as [initial_enrichments()],
+#' @return A `data.frame` with the same structure as [initial_enrichments_blank()],
 #'   covering exactly the rows currently in `source_data`.
 #'
 #' @importFrom dplyr left_join
@@ -122,7 +122,7 @@ initial_enrichments <- function(source_data, row_id, enrich_specs) {
 #'
 #' @noRd
 merge_enrichments <- function(source_data, row_id, enrich_specs, existing) {
-  blank <- initial_enrichments(source_data, row_id, enrich_specs)
+  blank <- initial_enrichments_blank(source_data, row_id, enrich_specs)
   merged <- dplyr::left_join(
     blank[, row_id, drop = FALSE],
     existing,
