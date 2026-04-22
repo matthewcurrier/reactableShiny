@@ -186,6 +186,39 @@ annotator_enriched_ui <- function(id) {
 #'   `source_data` are silently dropped. Used to restore checkbox state when
 #'   re-opening an existing report.
 #'
+#' @param reset_to `reactive` or `NULL`. An optional reactive expression
+#'   returning a named list with two elements:
+#'   \describe{
+#'     \item{`selected`}{A character vector of `row_id` values to restore as
+#'       the new selection. Pass `character(0)` or `NULL` to clear all
+#'       selections.}
+#'     \item{`enrichments`}{A data frame of pre-populated enrichment values in
+#'       the same structure as `initial_enrichments`, or `NULL` to start with a
+#'       fully blank enrichment frame.}
+#'   }
+#'   When this reactive fires, the module replaces its internal `selected_ids`
+#'   and `enrichments` state with the supplied seeds and forces a full table
+#'   re-render. This is the correct mechanism for resetting the module when the
+#'   same Shiny session switches between different data contexts (e.g. opening
+#'   Report B after Report A) without a page refresh. The observer is registered
+#'   with `ignoreInit = TRUE` so the startup path — driven by
+#'   `initial_selected` and `initial_enrichments` — is never disturbed.
+#'   Defaults to `NULL` (no mid-session reset; behavior is identical to the
+#'   previous version — fully backward compatible). The recommended calling
+#'   pattern is to pass a `reactiveVal(NULL)` that starts as `NULL` and is
+#'   only set when a genuine context switch occurs — this is what keeps the
+#'   module's `ignoreNULL = TRUE` from firing at startup, without needing any
+#'   `ignoreInit` logic inside the module itself:
+#'   \preformatted{
+#'     reset_signal <- shiny::reactiveVal(NULL)
+#'     shiny::observeEvent(data_r(), {
+#'       reset_signal(list(
+#'         selected    = build_initial_selected(data_r()),
+#'         enrichments = build_initial_enrichments(data_r())
+#'       ))
+#'     }, ignoreInit = TRUE)
+#'   }
+#'
 #' @param selection `character(1)`. Either `"multiple"` (default) or
 #'   `"single"`.
 #'
@@ -220,6 +253,7 @@ annotator_enriched_server <- function(
   enrich_specs,
   initial_enrichments = NULL,
   initial_selected = character(0),
+  reset_to = NULL,
   selection = "multiple",
   reactable_theme = theme_bare,
   reactable_options = list()
@@ -306,6 +340,90 @@ annotator_enriched_server <- function(
       },
       ignoreInit = TRUE
     )
+
+    # -------------------------------------------------------------------------
+    # Mid-session context switch — reset_to
+    #
+    # When the caller signals a report switch by updating reset_to(), this
+    # observer replaces the module's internal state in three steps:
+    #
+    #   1. selected_ids  ← reset_to()$selected  (character vector, coerced)
+    #   2. enrichments   ← rebuilt via merge_enrichments() from the supplied
+    #                       seed (or blank if seed is NULL)
+    #   3. reactable_remount_trigger is bumped → full table re-render
+    #
+    # Gate re-sync happens automatically: setting selected_ids() invalidates
+    # the gate sync observer, which queues an enrichmentGateSync message.
+    # Shiny delivers the table re-render output before custom messages, so
+    # gates are correctly opened for the restored selection.
+    #
+    # Interaction with source_data observer:
+    #   When a report switch changes data_r(), both source_data() and
+    #   reset_to() are invalidated. Both observers fire in the same reactive
+    #   flush. In either execution order the final state is correct:
+    #   - source_data first: merges stale enrichments, then reset_to overwrites. ✓
+    #   - reset_to first: sets fresh seed, source_data merge is a no-op. ✓
+    #
+    # ignoreNULL = TRUE  : NULL values (including the startup state when the
+    #   caller uses reactiveVal(NULL)) are silently skipped. This is the
+    #   mechanism that prevents the observer from overwriting initial_selected
+    #   and initial_enrichments at startup — NO ignoreInit needed in the module.
+    #
+    # ignoreInit = FALSE : startup suppression is the CALLER'S responsibility,
+    #   not the module's. The recommended calling pattern is:
+    #
+    #     reset_signal <- shiny::reactiveVal(NULL)   # NULL at startup
+    #     shiny::observeEvent(data_r(), {            # fires only on switch
+    #       reset_signal(list(
+    #         selected    = build_initial_selected(data_r()),
+    #         enrichments = build_initial_enrichments(data_r())
+    #       ))
+    #     }, ignoreInit = TRUE)
+    #
+    #   Because reset_signal starts as NULL, ignoreNULL = TRUE in this
+    #   observer silently skips it. The first non-NULL value only arrives
+    #   when the caller explicitly signals a switch — exactly when we want
+    #   the reset to fire. This is safer than using ignoreInit = TRUE here:
+    #   Shiny's ignoreInit flag is consumed by the first reactive flush;
+    #   if testServer's first flush happens AFTER the caller sets a non-NULL
+    #   value, ignoreInit would swallow the first real signal.
+    # -------------------------------------------------------------------------
+
+    if (!is.null(reset_to)) {
+      shiny::observeEvent(
+        reset_to(),
+        {
+          seed <- reset_to()
+          new_selected <- as.character(
+            if (is.null(seed$selected)) character(0) else seed$selected
+          )
+          new_enrichments <- seed$enrichments
+
+          selected_ids(new_selected)
+
+          enrichments(
+            if (!is.null(new_enrichments)) {
+              merge_enrichments(
+                shiny::isolate(source_data()),
+                row_id,
+                enrich_specs,
+                new_enrichments
+              )
+            } else {
+              initial_enrichments_blank(
+                shiny::isolate(source_data()),
+                row_id,
+                enrich_specs
+              )
+            }
+          )
+
+          reactable_remount_trigger(reactable_remount_trigger() + 1)
+        },
+        ignoreNULL = TRUE,
+        ignoreInit = FALSE
+      )
+    }
 
     # -------------------------------------------------------------------------
     # Sync reactable selection → selected_ids

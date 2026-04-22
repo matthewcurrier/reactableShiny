@@ -12,6 +12,7 @@ annotator_enriched_server(
   enrich_specs,
   initial_enrichments = NULL,
   initial_selected = character(0),
+  reset_to = NULL,
   selection = "multiple",
   reactable_theme = theme_bare,
   reactable_options = list()
@@ -67,6 +68,39 @@ that should appear as selected on first render. Defaults to
 `character(0)` (nothing pre-selected). Values not present in
 `source_data` are silently dropped. Used to restore checkbox state when
 re-opening an existing report.}
+
+\item{reset_to}{`reactive` or `NULL`. An optional reactive expression
+returning a named list with two elements:
+\describe{
+  \item{`selected`}{A character vector of `row_id` values to restore as
+    the new selection. Pass `character(0)` or `NULL` to clear all
+    selections.}
+  \item{`enrichments`}{A data frame of pre-populated enrichment values in
+    the same structure as `initial_enrichments`, or `NULL` to start with a
+    fully blank enrichment frame.}
+}
+When this reactive fires, the module replaces its internal `selected_ids`
+and `enrichments` state with the supplied seeds and forces a full table
+re-render. This is the correct mechanism for resetting the module when the
+same Shiny session switches between different data contexts (e.g. opening
+Report B after Report A) without a page refresh. The observer is registered
+with `ignoreInit = TRUE` so the startup path — driven by
+`initial_selected` and `initial_enrichments` — is never disturbed.
+Defaults to `NULL` (no mid-session reset; behavior is identical to the
+previous version — fully backward compatible). The recommended calling
+pattern is to pass a `reactiveVal(NULL)` that starts as `NULL` and is
+only set when a genuine context switch occurs — this is what keeps the
+module's `ignoreNULL = TRUE` from firing at startup, without needing any
+`ignoreInit` logic inside the module itself:
+\preformatted{
+  reset_signal <- shiny::reactiveVal(NULL)
+  shiny::observeEvent(data_r(), {
+    reset_signal(list(
+      selected    = build_initial_selected(data_r()),
+      enrichments = build_initial_enrichments(data_r())
+    ))
+  }, ignoreInit = TRUE)
+}}
 
 \item{selection}{`character(1)`. Either `"multiple"` (default) or
 `"single"`.}
