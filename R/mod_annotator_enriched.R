@@ -9,16 +9,27 @@
 #
 # Gating mechanism:
 #   Each enrichment input is wrapped in <div class="enrichment-gate">.
-#   CSS sets all gates to greyed/non-interactive by default. A JavaScript
-#   MutationObserver watches the reactable table for cell re-renders — when
-#   reactable re-renders the "Select" checkbox cell (which happens on every
-#   row selection or deselection), the observer fires syncGatesForRow() for
-#   that row, reading the checkbox's .checked state and toggling opacity and
-#   pointer-events on every .enrichment-gate in the same row.
+#   The default closed state (greyed/non-interactive) is baked into the
+#   rendered HTML via an inline style on each gate div. Gates are opened and
+#   closed by the enrichmentGateSync custom message handler, which is called
+#   from two places:
+#
+#     1. The gate-sync observeEvent — fires whenever selected_ids() changes
+#        during the session (user clicks, reset button, mid-session reset_to).
+#
+#     2. The end of renderReactable — fires once after every full table
+#        re-render (startup, source_data change, reset_to). This is the fix
+#        for pre-populated tables: at startup the gate-sync observer fires
+#        before the DOM contains any .enrichment-gate elements, so its
+#        querySelectorAll finds nothing. Sending the same message from inside
+#        renderReactable guarantees that the gates are opened for any
+#        pre-selected rows AFTER reactable has painted them into the DOM.
+#        selected_ids() is read via isolate() so renderReactable does not
+#        take a reactive dependency on it.
 #
 #   This approach is robust regardless of how reactable marks selected rows
-#   in the DOM (aria-selected, inline styles, CSS classes, etc.), and does
-#   not require any external CSS file — the module is fully self-contained.
+#   in the DOM, and does not require any external CSS file — the module is
+#   fully self-contained.
 #
 # State model:
 #   selected_ids   — reactiveVal(character vector) of selected row IDs.
@@ -38,21 +49,15 @@
 #                themes.R (theme_bare)
 # =============================================================================
 
-# Inline JS — MutationObserver that syncs .enrichment-gate state whenever
-# reactable re-renders a checkbox cell due to a selection change. Injected
-# once per page via htmltools::singleton().
+# Inline JS — custom message handler that syncs .enrichment-gate state.
+# Injected once per page via htmltools::singleton().
 #
-# The gate sync is driven by Shiny's own messaging infrastructure rather
-# than any client-side DOM observation. When selected_ids() changes on the
-# server, an observeEvent sends a custom message listing which row IDs are
-# open. The handler below finds every .enrichment-gate by its data-row-id
-# attribute and applies the correct inline styles.
+# The handler is called from two places in the server (see module header):
+#   1. The gate-sync observeEvent (selection changes during the session).
+#   2. The end of renderReactable (after every full table paint).
 #
-# This is reliable because:
-#   - selected_ids() is already the authoritative source of selection truth.
-#   - session$sendCustomMessage() is standard Shiny — no DOM timing involved.
-#   - data-row-id is baked into the HTML at render time by R, so the handler
-#     never needs to parse input IDs or inspect checkbox state.
+# Both calls pass the same payload — tableId and the current openIds vector —
+# so the handler is stateless and idempotent.
 .enriched_gate_js <- htmltools::singleton(
   htmltools::tags$head(
     htmltools::tags$script(htmltools::HTML(
@@ -352,10 +357,12 @@ annotator_enriched_server <- function(
     #                       seed (or blank if seed is NULL)
     #   3. reactable_remount_trigger is bumped → full table re-render
     #
-    # Gate re-sync happens automatically: setting selected_ids() invalidates
-    # the gate sync observer, which queues an enrichmentGateSync message.
-    # Shiny delivers the table re-render output before custom messages, so
-    # gates are correctly opened for the restored selection.
+    # Gate re-sync happens via two paths (see module header):
+    #   - The gate-sync observer fires because selected_ids() changed.
+    #   - renderReactable sends a post-render sync after the table paints.
+    # Both are needed: the observer handles the live-session path; the
+    # post-render sync handles the initial-paint path where the DOM may not
+    # yet contain .enrichment-gate elements when the observer fires.
     #
     # Interaction with source_data observer:
     #   When a report switch changes data_r(), both source_data() and
@@ -458,16 +465,23 @@ annotator_enriched_server <- function(
     )
 
     # -------------------------------------------------------------------------
-    # Push gate state to the client whenever selection changes
+    # Push gate state to the client whenever selection changes (live path)
     #
     # selected_ids() is the authoritative source of selection truth. Whenever
-    # it changes we send a custom message listing the open row IDs. The JS
-    # handler in .enriched_gate_js uses data-row-id attributes (baked into
-    # the HTML by R at render time) to find the correct gate divs and apply
-    # inline styles — no DOM timing or React internals involved.
+    # it changes during an active session (user click, reset button, reset_to)
+    # we send a custom message listing the open row IDs. The JS handler in
+    # .enriched_gate_js uses data-row-id attributes to find the correct gate
+    # divs and apply inline styles.
     #
-    # ignoreInit = FALSE so gates are synced on first render (handles the
-    # case where defaultSelected pre-selects rows).
+    # This observer handles the LIVE path only. It fires before the DOM
+    # contains .enrichment-gate elements at startup (when selected_ids is
+    # initialised to seed_ids), so its querySelectorAll finds nothing.
+    # The POST-RENDER path inside renderReactable handles that initial-paint
+    # case — see the comment there.
+    #
+    # ignoreInit = FALSE is kept so that mid-session reset_to() triggers
+    # correctly when selected_ids() is set before reactable_remount_trigger()
+    # bumps and the table re-renders.
     # -------------------------------------------------------------------------
 
     shiny::observeEvent(
@@ -536,12 +550,21 @@ annotator_enriched_server <- function(
     # registering reactive dependencies that would cause unwanted re-renders.
     #
     # render_data structure:
-    #   - Select    : NA_character_ placeholder (checkbox rendered by JS)
+    #   - Select      : NA_character_ placeholder (checkbox rendered by JS)
     #   - display_cols: read-only values from source_data()
     #   - enrich_names: current enrichment values (from snapshot)
     #
     # The enrichment snapshot (enr) is passed to make_enriched_col_def() so
     # cell functions close over a stable value rather than a live reactive.
+    #
+    # POST-RENDER GATE SYNC (the startup fix):
+    #   After building the reactable object we send an enrichmentGateSync
+    #   message. Shiny batches render output and custom messages in the same
+    #   flush, delivering the HTML update to the browser first and then the
+    #   message. This guarantees that .enrichment-gate elements exist in the
+    #   DOM when the JS handler runs, so gates for pre-selected rows are
+    #   correctly opened on initial paint — something the standing gate-sync
+    #   observer (which fires before the DOM is ready) cannot achieve alone.
     # -------------------------------------------------------------------------
 
     output$table <- reactable::renderReactable({
@@ -604,7 +627,7 @@ annotator_enriched_server <- function(
         enrich_col_defs
       )
 
-      do.call(
+      result <- do.call(
         reactable::reactable,
         c(
           list(
@@ -620,6 +643,20 @@ annotator_enriched_server <- function(
           reactable_options
         )
       )
+
+      # Post-render gate sync — open gates for any pre-selected rows after
+      # reactable has painted .enrichment-gate elements into the DOM.
+      # isolate() keeps renderReactable from taking a dependency on
+      # selected_ids(), which would cause an unwanted re-render on every click.
+      session$sendCustomMessage(
+        "enrichmentGateSync",
+        list(
+          tableId = element_id,
+          openIds = as.list(shiny::isolate(selected_ids()))
+        )
+      )
+
+      result
     })
 
     # -------------------------------------------------------------------------
