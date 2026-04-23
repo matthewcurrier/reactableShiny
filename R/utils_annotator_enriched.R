@@ -9,16 +9,19 @@
 #     (select, text, date, number).
 #   - Dispatch a spec to its builder via make_enriched_col_def().
 #
-# Gating design note:
-#   Visual gating (greyed-out inputs on unselected rows) is handled entirely
-#   in custom.css via the selector:
+# Gating design:
+#   Each enrichment input is wrapped in <div class="enrichment-gate">.
+#   The correct open/closed inline style is chosen at render time on the
+#   server using gate_initial_style(): rows whose ID appears in
+#   selected_ids_snap receive .gate_style_open; all others receive
+#   .gate_style_closed. This bakes the correct initial state directly into
+#   the server-rendered HTML, so no JS timing dependency is involved for
+#   the initial paint.
 #
-#       .rt-tr[aria-selected="true"] .enrichment-gate { ... }
-#
-#   reactable sets aria-selected="true" on selected row <div role="row">
-#   elements. Because the gating is CSS-driven, cell HTML is identical for
-#   selected and unselected rows — React's reconciliation will not re-render
-#   inputs on selection change, preserving any values the user has typed.
+#   After the initial render, live selection changes (user clicks, reset
+#   button, reset_to) are handled by the enrichmentGateSync custom message
+#   handler registered in annotator_enriched_ui(), which toggles
+#   gate.style.opacity and gate.style.pointerEvents via data-row-id lookup.
 #
 # Relationship to utils_annotator.R:
 #   This file is intentionally separate. The annotator_table helpers carry
@@ -130,8 +133,6 @@ merge_enrichments <- function(source_data, row_id, enrich_specs, existing) {
   )
 
   # Replace NAs introduced by the left join with per-type defaults.
-  # This handles rows that were in source_data before but not in existing,
-  # as well as any type mismatches that could arise from the join.
   purrr::walk(enrich_specs, function(spec) {
     col <- spec$name
     missing_rows <- is.na(merged[[col]])
@@ -145,30 +146,60 @@ merge_enrichments <- function(source_data, row_id, enrich_specs, existing) {
 
 
 # -----------------------------------------------------------------------
+# Gate style helpers
+#
+# The correct style is chosen at server render time so no JS timing is
+# needed for the initial paint of pre-populated tables. Live changes after
+# the initial render are handled by the enrichmentGateSync message handler.
+# -----------------------------------------------------------------------
+
+# Inline style constants for gate divs.
+.gate_style_open <- "opacity: 1; pointer-events: auto; transition: opacity 0.12s ease;"
+.gate_style_closed <- "opacity: 0.35; pointer-events: none; transition: opacity 0.12s ease;"
+
+#' Choose the correct initial gate style for one row
+#'
+#' Returns the open style when `id_value` is present in `selected_ids_snap`,
+#' and the closed style otherwise. Called once per cell at server render time
+#' so that pre-selected rows have their fields immediately active without
+#' depending on JS executing after the DOM is ready.
+#'
+#' @param id_value The row's unique identifier value (will be coerced to
+#'   character for comparison).
+#' @param selected_ids_snap `character`. Snapshot of currently selected row
+#'   IDs, captured via `isolate(selected_ids())` in `renderReactable`.
+#'
+#' @return `character(1)`. A CSS inline style string.
+#'
+#' @noRd
+gate_initial_style <- function(id_value, selected_ids_snap) {
+  if (as.character(id_value) %in% selected_ids_snap) {
+    .gate_style_open
+  } else {
+    .gate_style_closed
+  }
+}
+
+
+# -----------------------------------------------------------------------
 # Column definition builders
 #
 # All builders follow the same pattern:
-#   - Accept (spec, enrich_snap, row_id, ns).
+#   - Accept (spec, enrich_snap, row_id, ns, selected_ids_snap).
 #   - enrich_snap is a frozen data frame snapshot captured via
 #     isolate(enrichments()) at renderReactable time. Closing over a snapshot
 #     (rather than the live reactive) means selection changes do not
 #     invalidate renderReactable, keeping the table stable between renders.
+#   - selected_ids_snap is a frozen character vector captured via
+#     isolate(selected_ids()) at renderReactable time. Used by
+#     gate_initial_style() to set the correct open/closed style per row
+#     directly in the server-rendered HTML.
 #   - The cell function wraps its input in <div class="enrichment-gate">
-#     with .gate_style_closed applied as an INLINE style. The default
-#     greyed/non-interactive state is therefore baked into the rendered HTML
-#     at the server side — no CSS file, no singleton, no timing issues.
-#     The MutationObserver in annotator_enriched_ui() then toggles
-#     gate.style.opacity and gate.style.pointerEvents when the row's
-#     checkbox re-renders after a click.
+#     using gate_initial_style() so selected rows start open and unselected
+#     rows start closed — no JS timing dependency for the initial paint.
 #   - Input IDs follow the pattern ns(paste0(spec$name, "_", id_value)),
 #     matching the sync observer in annotator_enriched_server().
 # -----------------------------------------------------------------------
-
-# Inline style applied to every gate div at render time. Sets the default
-# closed (non-interactive) state without relying on any external stylesheet.
-# The JS MutationObserver in annotator_enriched_ui() removes these constraints
-# when a row is selected and restores them when it is deselected.
-.gate_style_closed <- "opacity: 0.35; pointer-events: none; transition: opacity 0.12s ease;"
 
 #' Build a reactable colDef for a select enrichment column
 #'
@@ -181,11 +212,18 @@ merge_enrichments <- function(source_data, row_id, enrich_specs, existing) {
 #' @param enrich_snap `data.frame`. Frozen enrichments snapshot.
 #' @param row_id `character(1)`. Name of the ID column.
 #' @param ns `function`. Module namespace function.
+#' @param selected_ids_snap `character`. Frozen snapshot of selected row IDs.
 #'
 #' @return A [reactable::colDef()] object.
 #'
 #' @noRd
-make_enriched_select_col_def <- function(spec, enrich_snap, row_id, ns) {
+make_enriched_select_col_def <- function(
+  spec,
+  enrich_snap,
+  row_id,
+  ns,
+  selected_ids_snap
+) {
   reactable::colDef(
     name = spec$label %||% spec$name,
     width = spec$width,
@@ -199,7 +237,7 @@ make_enriched_select_col_def <- function(spec, enrich_snap, row_id, ns) {
 
       shiny::tags$div(
         class = "enrichment-gate",
-        style = .gate_style_closed,
+        style = gate_initial_style(id_value, selected_ids_snap),
         `data-row-id` = as.character(id_value),
         onclick = "event.stopPropagation();",
         shiny::tags$select(
@@ -226,11 +264,18 @@ make_enriched_select_col_def <- function(spec, enrich_snap, row_id, ns) {
 #' @param enrich_snap `data.frame`. Frozen enrichments snapshot.
 #' @param row_id `character(1)`. Name of the ID column.
 #' @param ns `function`. Module namespace function.
+#' @param selected_ids_snap `character`. Frozen snapshot of selected row IDs.
 #'
 #' @return A [reactable::colDef()] object.
 #'
 #' @noRd
-make_enriched_text_col_def <- function(spec, enrich_snap, row_id, ns) {
+make_enriched_text_col_def <- function(
+  spec,
+  enrich_snap,
+  row_id,
+  ns,
+  selected_ids_snap
+) {
   reactable::colDef(
     name = spec$label %||% spec$name,
     width = spec$width,
@@ -241,7 +286,7 @@ make_enriched_text_col_def <- function(spec, enrich_snap, row_id, ns) {
 
       shiny::tags$div(
         class = "enrichment-gate",
-        style = .gate_style_closed,
+        style = gate_initial_style(id_value, selected_ids_snap),
         `data-row-id` = as.character(id_value),
         onclick = "event.stopPropagation();",
         shiny::tags$input(
@@ -272,11 +317,18 @@ make_enriched_text_col_def <- function(spec, enrich_snap, row_id, ns) {
 #' @param enrich_snap `data.frame`. Frozen enrichments snapshot.
 #' @param row_id `character(1)`. Name of the ID column.
 #' @param ns `function`. Module namespace function.
+#' @param selected_ids_snap `character`. Frozen snapshot of selected row IDs.
 #'
 #' @return A [reactable::colDef()] object.
 #'
 #' @noRd
-make_enriched_date_col_def <- function(spec, enrich_snap, row_id, ns) {
+make_enriched_date_col_def <- function(
+  spec,
+  enrich_snap,
+  row_id,
+  ns,
+  selected_ids_snap
+) {
   reactable::colDef(
     name = spec$label %||% spec$name,
     width = spec$width,
@@ -287,7 +339,7 @@ make_enriched_date_col_def <- function(spec, enrich_snap, row_id, ns) {
 
       shiny::tags$div(
         class = "enrichment-gate",
-        style = .gate_style_closed,
+        style = gate_initial_style(id_value, selected_ids_snap),
         `data-row-id` = as.character(id_value),
         onclick = "event.stopPropagation();",
         shiny::tags$input(
@@ -315,11 +367,18 @@ make_enriched_date_col_def <- function(spec, enrich_snap, row_id, ns) {
 #' @param enrich_snap `data.frame`. Frozen enrichments snapshot.
 #' @param row_id `character(1)`. Name of the ID column.
 #' @param ns `function`. Module namespace function.
+#' @param selected_ids_snap `character`. Frozen snapshot of selected row IDs.
 #'
 #' @return A [reactable::colDef()] object.
 #'
 #' @noRd
-make_enriched_number_col_def <- function(spec, enrich_snap, row_id, ns) {
+make_enriched_number_col_def <- function(
+  spec,
+  enrich_snap,
+  row_id,
+  ns,
+  selected_ids_snap
+) {
   reactable::colDef(
     name = spec$label %||% spec$name,
     width = spec$width,
@@ -330,7 +389,7 @@ make_enriched_number_col_def <- function(spec, enrich_snap, row_id, ns) {
 
       shiny::tags$div(
         class = "enrichment-gate",
-        style = .gate_style_closed,
+        style = gate_initial_style(id_value, selected_ids_snap),
         `data-row-id` = as.character(id_value),
         onclick = "event.stopPropagation();",
         shiny::tags$input(
@@ -363,17 +422,51 @@ make_enriched_number_col_def <- function(spec, enrich_snap, row_id, ns) {
 #'   `isolate(enrichments())` captured at `renderReactable` time.
 #' @param row_id `character(1)`. Name of the ID column.
 #' @param ns `function`. Module namespace function (`session$ns`).
+#' @param selected_ids_snap `character`. Frozen snapshot of selected row IDs
+#'   from `isolate(selected_ids())` captured at `renderReactable` time.
+#'   Passed through to each builder so the correct initial gate style is baked
+#'   into the server-rendered HTML.
 #'
 #' @return A [reactable::colDef()] object.
 #'
 #' @noRd
-make_enriched_col_def <- function(spec, enrich_snap, row_id, ns) {
+make_enriched_col_def <- function(
+  spec,
+  enrich_snap,
+  row_id,
+  ns,
+  selected_ids_snap
+) {
   switch(
     spec$type,
-    select = make_enriched_select_col_def(spec, enrich_snap, row_id, ns),
-    text = make_enriched_text_col_def(spec, enrich_snap, row_id, ns),
-    date = make_enriched_date_col_def(spec, enrich_snap, row_id, ns),
-    number = make_enriched_number_col_def(spec, enrich_snap, row_id, ns),
+    select = make_enriched_select_col_def(
+      spec,
+      enrich_snap,
+      row_id,
+      ns,
+      selected_ids_snap
+    ),
+    text = make_enriched_text_col_def(
+      spec,
+      enrich_snap,
+      row_id,
+      ns,
+      selected_ids_snap
+    ),
+    date = make_enriched_date_col_def(
+      spec,
+      enrich_snap,
+      row_id,
+      ns,
+      selected_ids_snap
+    ),
+    number = make_enriched_number_col_def(
+      spec,
+      enrich_snap,
+      row_id,
+      ns,
+      selected_ids_snap
+    ),
     stop(sprintf("Unknown enrichment type: '%s'", spec$type))
   )
 }

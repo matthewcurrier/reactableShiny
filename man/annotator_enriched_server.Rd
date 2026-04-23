@@ -60,8 +60,7 @@ Must have the same structure as the frame produced by
 one column per enrichment spec. Rows absent from `source_data` are
 silently ignored; rows in `source_data` but absent here receive their
 untouched defaults. Pass `NULL` (the default) to start with a fully blank
-state. Typically constructed from a saved report's data frame via the
-same dplyr pipeline used by the host module's `build_initial_*` helper.}
+state.}
 
 \item{initial_selected}{`character`. A character vector of `row_id` values
 that should appear as selected on first render. Defaults to
@@ -83,15 +82,10 @@ When this reactive fires, the module replaces its internal `selected_ids`
 and `enrichments` state with the supplied seeds and forces a full table
 re-render. This is the correct mechanism for resetting the module when the
 same Shiny session switches between different data contexts (e.g. opening
-Report B after Report A) without a page refresh. The observer is registered
-with `ignoreInit = TRUE` so the startup path — driven by
-`initial_selected` and `initial_enrichments` — is never disturbed.
-Defaults to `NULL` (no mid-session reset; behavior is identical to the
-previous version — fully backward compatible). The recommended calling
+Report B after Report A) without a page refresh.
+Defaults to `NULL` (no mid-session reset). The recommended calling
 pattern is to pass a `reactiveVal(NULL)` that starts as `NULL` and is
-only set when a genuine context switch occurs — this is what keeps the
-module's `ignoreNULL = TRUE` from firing at startup, without needing any
-`ignoreInit` logic inside the module itself:
+only set when a genuine context switch occurs:
 \preformatted{
   reset_signal <- shiny::reactiveVal(NULL)
   shiny::observeEvent(data_r(), {

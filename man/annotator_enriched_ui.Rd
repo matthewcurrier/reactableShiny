@@ -13,7 +13,7 @@ annotator_enriched_ui(id)
 \value{
 A named list with two elements:
   \describe{
-    \item{`table`}{A [htmltools::tagList()] containing the CSS/JS assets
+    \item{`table`}{A [htmltools::tagList()] containing the JS asset
       and a [reactable::reactableOutput()] placeholder.}
     \item{`reset_button`}{An [shiny::actionButton()] that clears all
       selections without re-rendering the table.}
@@ -25,8 +25,8 @@ independently in their layout, so the table and reset button can live in
 different panels.
 }
 \details{
-The module is fully self-contained: the CSS and JavaScript required for
-enrichment gate gating are embedded inline and injected once per page via
+The module is fully self-contained: the JavaScript required for live gate
+toggling is embedded inline and injected once per page via
 [htmltools::singleton()]. No external CSS file is needed.
 }
 \seealso{
