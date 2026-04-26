@@ -31,9 +31,11 @@ Suggests:
     here,
     tibble,
     arrow,
+    quarto,
+    shinylive,
     reactable.extras
 Config/testthat/edition: 3
-VignetteBuilder: knitr
+VignetteBuilder: quarto
 Config/Needs/website: rmarkdown
 URL: https://github.com/matthewcurrier/reactable.shiny, https://matthewcurrier.github.io/reactable.shiny/
 BugReports: https://github.com/matthewcurrier/reactable.shiny/issues

@@ -96,8 +96,8 @@ annotator_super_simple_ui <- function(id) {
 #'   passed directly to [reactable::reactable()] via [base::do.call()].
 #'   Useful for `sortable`, `searchable`, `striped`, `groupBy`, etc.
 #'   Do not include `data`, `selection`, `onClick`, `rowStyle`, `columns`,
-#'   `defaultSelected`, `elementId`, or `theme` — these are owned by the
-#'   module and will cause a duplicate argument error if included here.
+#'   `defaultSelected`, or `theme` — these are owned by the module and will
+#'   cause a duplicate argument error if included here.
 #'
 #' @return A [shiny::reactive()] returning a character vector of selected
 #'   row IDs (values of the `row_id` column for currently selected rows).
@@ -112,20 +112,16 @@ annotator_super_simple_ui <- function(id) {
 #'
 #' @export
 annotator_super_simple_server <- function(
-  id,
-  source_data,
-  row_id,
-  display_cols,
-  selection = "multiple",
-  reactable_theme = theme_bare,
-  reactable_options = list()
+    id,
+    source_data,
+    row_id,
+    display_cols,
+    selection = "multiple",
+    reactable_theme = theme_bare,
+    reactable_options = list()
 ) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-
-    # Stable elementId for getReactableState — derived from the module
-    # namespace so multiple instances never collide.
-    element_id <- ns("table")
 
     # -------------------------------------------------------------------------
     # Persistent selection state
@@ -141,21 +137,25 @@ annotator_super_simple_server <- function(
     # -------------------------------------------------------------------------
     # Reset button
     #
-    # Uses updateReactable to clear the JS selection state directly rather
-    # than bumping a render trigger. This fires getReactableState with NULL,
-    # which the sync observer below handles by clearing selected_ids.
+    # Clears selected_ids() unconditionally (visible and hidden rows), then
+    # calls updateReactable to clear the JS selection state in the browser.
     #
-    # This approach avoids the race condition where:
-    #   1. selected_ids is cleared
-    #   2. render_trigger bumps
-    #   3. getReactableState fires with the OLD JS indices before re-render
-    #   4. The observer repopulates selected_ids from the stale indices
-    #   5. The table re-renders and re-selects the old rows
+    # selected_ids() is cleared first and directly rather than relying on the
+    # sync observer's NULL branch, because that branch only removes visible-row
+    # IDs (via setdiff) — it intentionally preserves hidden-row IDs as part of
+    # the normal persistence logic. Reset must bypass that and clear everything.
+    #
+    # The race condition described in earlier versions of this comment (where
+    # clearing selected_ids before a re-render caused stale indices to
+    # repopulate it) does not apply here: reset never triggers a re-render, so
+    # there is nothing to race against. When the sync observer's NULL branch
+    # fires afterward, setdiff(character(0), visible_ids) is a no-op.
     # -------------------------------------------------------------------------
 
     observeEvent(
       input$reset,
       {
+        selected_ids(character(0))
         reactable::updateReactable("table", selected = NA, session = session)
       },
       ignoreInit = TRUE
@@ -271,7 +271,6 @@ annotator_super_simple_server <- function(
             rowStyle = list(cursor = "pointer"),
             columns = col_defs,
             defaultSelected = default_selected,
-            elementId = element_id,
             theme = reactable_theme
           ),
           reactable_options

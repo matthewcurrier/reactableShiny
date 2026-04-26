@@ -1,4 +1,9 @@
 url: https://matthewcurrier.github.io/reactable.shiny/
 template:
   bootstrap: 5
+  theme: breeze-light
+navbar:
+  structure:
+    left:  [intro, reference, articles, tutorials, news]
+    right: [search, github, lightswitch]
 

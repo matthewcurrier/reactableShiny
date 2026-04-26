@@ -40,8 +40,8 @@ the rendered table. Defaults to `theme_bare`.}
 passed directly to [reactable::reactable()] via [base::do.call()].
 Useful for `sortable`, `searchable`, `striped`, `groupBy`, etc.
 Do not include `data`, `selection`, `onClick`, `rowStyle`, `columns`,
-`defaultSelected`, `elementId`, or `theme` — these are owned by the
-module and will cause a duplicate argument error if included here.}
+`defaultSelected`, or `theme` — these are owned by the module and will
+cause a duplicate argument error if included here.}
 }
 \value{
 A [shiny::reactive()] returning a character vector of selected

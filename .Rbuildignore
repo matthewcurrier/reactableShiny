@@ -8,3 +8,5 @@
 ^README\.Rmd$
 ^LICENSE\.md$
 ^inst/quarto-annotator_files$
+^\.positai$
+^\.claude$
