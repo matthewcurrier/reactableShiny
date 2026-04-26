@@ -6,7 +6,7 @@ articles:
   annotator-super-simple: annotator-super-simple.html
   annotator_table: annotator_table.html
   articles/flexible-table: flexible-table.html
-last_built: 2026-04-26T23:49Z
+last_built: 2026-04-26T23:53Z
 urls:
   reference: https://matthewcurrier.github.io/reactable.shiny/reference
   article: https://matthewcurrier.github.io/reactable.shiny/articles
