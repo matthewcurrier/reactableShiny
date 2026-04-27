@@ -8,3 +8,4 @@ navbar:
     right: [search, github, lightswitch]
 extra_files:
   - _extensions
+url: https://matthewcurrier.github.io/reactableShiny/

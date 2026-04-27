@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# reactableShiny
+# reactable.shiny
 
 <!-- badges: start -->
 
@@ -15,7 +15,7 @@ data to databases.
 
 ## Installation
 
-You can install the development version of reactable.shiny from
+You can install the development version of reactableShiny from
 [GitHub](https://github.com/) with:
 
 ``` r

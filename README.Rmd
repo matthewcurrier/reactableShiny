@@ -23,7 +23,7 @@ The goal of reactableShiny is to combine the unique features of the reactable pa
 
 ## Installation
 
-You can install the development version of reactable.shiny from [GitHub](https://github.com/) with:
+You can install the development version of reactableShiny from [GitHub](https://github.com/) with:
 
 ``` r
 # install.packages("pak")

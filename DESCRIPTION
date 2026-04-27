@@ -37,5 +37,5 @@ Suggests:
 Config/testthat/edition: 3
 VignetteBuilder: quarto
 Config/Needs/website: rmarkdown
-URL: https://github.com/matthewcurrier/reactable.shiny, https://matthewcurrier.github.io/reactable.shiny/
-BugReports: https://github.com/matthewcurrier/reactable.shiny/issues
+URL: https://github.com/matthewcurrier/reactable.shiny, https://matthewcurrier.github.io/reactableShiny/
+BugReports: https://github.com/matthewcurrier/reactableShiny/issues
