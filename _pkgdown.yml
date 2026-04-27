@@ -8,3 +8,8 @@ navbar:
 extra_files:
   - _extensions
 url: https://matthewcurrier.github.io/reactableShiny/
+repo:
+  url:
+    home: https://github.com/matthewcurrier/reactableShiny
+    source: https://github.com/matthewcurrier/reactableShiny/blob/main/
+    issue: https://github.com/matthewcurrier/reactableShiny/issues/
