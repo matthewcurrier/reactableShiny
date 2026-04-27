@@ -1,15 +1,33 @@
-docs
+# pkgdown output
+docs/
+
+# R session artifacts
 .Rproj.user
 .Rhistory
 .RData
 .Renviron
 .Ruserdata
+
+# Compiled objects
 *.o
 *.so
 *.dll
 src/*.o
 src/*.so
+
+# Package internals
 inst/testapp
 inst/scripts
 inst/doc
+inst/docs
+
+# IDE
 .positai
+*.Rproj
+
+# Quarto / knitr build artifacts
+_freeze/
+*_cache/
+*_files/
+*.utf8.md
+*.knit.md
