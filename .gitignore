@@ -10,7 +10,6 @@ docs
 src/*.o
 src/*.so
 inst/testapp
-inst/docs
 inst/scripts
 inst/doc
 .positai
