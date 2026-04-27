@@ -1,0 +1,142 @@
+# Annotator table — server
+
+Server-side logic for a Shiny module that renders a
+\[reactable::reactable()\] table combining read-only display columns
+from a source data frame with interactive input columns. The module
+returns a reactive data frame containing the row ID and annotation
+values for every row where at least one input has been touched by the
+user.
+
+## Usage
+
+``` r
+annotator_table_server(
+  id,
+  source_data,
+  row_id,
+  col_specs,
+  reactable_theme = theme_bare,
+  reactable_options = list(),
+  initial_values = reactive(NULL)
+)
+```
+
+## Arguments
+
+- id:
+
+  \`character(1)\`. The Shiny module namespace ID. Must match the \`id\`
+  passed to \[annotator_table_ui()\].
+
+- source_data:
+
+  \`reactive\`. A reactive expression returning the source data frame.
+  Column names must include the column named by \`row_id\` and all
+  columns referenced by display col_specs.
+
+- row_id:
+
+  \`character(1)\`. The name of the column in \`source_data\` that
+  uniquely identifies each row (e.g. \`"id"\` or \`"car_name"\`).
+
+- col_specs:
+
+  \`list\`. A list of column specification lists describing every column
+  to show in the table. Each entry must have a \`name\` and \`type\`.
+  Supported types and their additional fields:
+
+  \`"display"\`
+
+  :   Read-only column sourced from \`source_data\`. \`name\` must match
+      a column in the data frame.
+
+  \`"select"\`
+
+  :   Dropdown. Requires \`choices\`: a named character vector.
+
+  \`"checkbox"\`
+
+  :   Checkbox. No additional fields required.
+
+  \`"text"\`
+
+  :   Free-text input. Optionally accepts \`placeholder\`.
+
+  \`"number"\`
+
+  :   Numeric input. Optionally accepts \`min\` and \`max\`.
+
+  \`"radio"\`
+
+  :   Radio button group. Requires \`choices\`: a named character
+      vector.
+
+  All types accept an optional \`label\` (defaults to \`name\`) and
+  optional \`width\` in pixels.
+
+- reactable_theme:
+
+  A \[reactable::reactableTheme()\] object applied to the rendered
+  table. Defaults to \`theme_bare\`.
+
+- reactable_options:
+
+  \`list\`. Additional arguments passed to \[reactable::reactable()\]
+  via \[base::do.call()\].
+
+- initial_values:
+
+  \`reactive\`. A reactive returning a data frame of pre-existing
+  annotation values to seed the module. Defaults to \`reactive(NULL)\`.
+
+## Value
+
+A \[shiny::reactive()\] returning a data frame with the \`row_id\`
+column and all input annotation columns, filtered to rows where at least
+one input has been touched. Display columns are not included in the
+return value.
+
+## Details
+
+Annotations are preserved across reactive changes to \`source_data\` —
+if the source data is filtered and a previously annotated row
+disappears, its annotation is retained and restored if that row
+reappears.
+
+## See also
+
+\[annotator_table_ui()\]
+
+## Examples
+
+``` r
+if (FALSE) { # \dontrun{
+col_specs <- list(
+  list(name = "car",      type = "display",  label = "Car"),
+  list(name = "mpg",      type = "display",  label = "MPG"),
+  list(name = "category", type = "select",   label = "Category",
+       choices = c("Cheap" = "cheap", "Expensive" = "expensive")),
+  list(name = "approved",  type = "checkbox", label = "Approved?"),
+  list(name = "notes",     type = "text",     label = "Notes")
+)
+
+ui <- bslib::page_fluid(
+  annotator_table_ui("cars")
+)
+
+server <- function(input, output, session) {
+  source <- reactive(mtcars)
+
+  result <- annotator_table_server(
+    id          = "cars",
+    source_data = source,
+    row_id      = "car_name",
+    col_specs   = col_specs
+  )
+
+  observe(print(result()))
+}
+
+shinyApp(ui, server)
+} # }
+```

@@ -1,0 +1,417 @@
+# Overview
+
+# Overview
+
+The `flexible_table_ui()` and `flexible_table_server()` r shiny module
+leverage the [reactable package](https://glin.github.io/reactable/) to
+facilitate dynamic data entry. Reactable acts as a scaffold for user
+input. The user establishes choices for a select dropdown which are
+passed into a reactable table for selection. The user can **add rows**,
+**delete rows**, and **reset the table**. The module **returns a
+reactive data frame** of the current selections.
+
+## Simple Example: People Who Live in Your Home
+
+Letâ€™s say you have a survey where you want to know who lives in the
+household with a user. Your list of possible people includes the below:
+
+``` r
+home_occupants <- c(
+  "mother",
+  "father",
+  "grandmother",
+  "grandfather",
+  "sibling",
+  "sibling (male)",
+  "sibling (female)",
+  "step-mother",
+  "step-father",
+  "partner",
+  "spouse")
+```
+
+You are also curious to know what the people in this household do for a
+living.
+
+``` r
+professions <- c(
+  "doctor",
+  "lawyer",
+  "professor",
+  "astronaut",
+  "chef",
+  "dog walker"
+)
+```
+
+### Step 1: Detail the Dropdown Specifications
+
+Every dropdown in the table is described by a **column spec** â€” a
+named list with at minimum a `name`, `label`, and `choices`:
+
+``` r
+col_specs <- list(
+  list(
+    name    = "home_occupants",
+    label   = "Home Occupants",
+    choices = setNames(
+      c(1:length(home_occupants)),
+      home_occupants
+    )
+  ),
+  list(
+    name = "professions",
+    label = "Profession",
+    choices = setNames(
+      c(1:length(professions)),
+      professions      
+    )
+  )
+)
+```
+
+For this example, we will be collecting information on `home_occupant`
+and `profession`.
+
+### Step 2: Create Shiny App
+
+``` r
+library(shiny)
+library(bslib)
+library(purrr)
+library(reactable)
+library(reactableShiny)
+
+home_occupants <- c(
+  "mother",
+  "father",
+  "grandmother",
+  "grandfather",
+  "sibling",
+  "sibling (male)",
+  "sibling (female)",
+  "step-mother",
+  "step-father",
+  "partner",
+  "spouse")
+
+professions <- c(
+  "doctor",
+  "lawyer",
+  "professor",
+  "astronaut",
+  "chef",
+  "dog walker"
+)
+
+col_specs <- list(
+  list(
+    name    = "home_occupants",
+    label   = "Home Occupants",
+    choices = setNames(
+      c(1:length(home_occupants)),
+      home_occupants
+    )
+  ),
+  list(
+    name = "professions",
+    label = "Profession",
+    choices = setNames(
+      c(1:length(professions)),
+      professions      
+    )
+  )
+)
+
+ui <- page_fluid(
+  do.call(tagList, flexible_table_ui("example")),
+  verbatimTextOutput("result")
+)
+
+server <- function(input, output, session) {
+  selected <- flexible_table_server("example", col_specs)
+
+  output$result <- renderPrint(selected())
+}
+
+shinyApp(ui, server)
+```
+
+### Wiring up the UI
+
+`flexible_table_ui()` returns a **named list** rather than a single UI
+element. This lets you place the table and its buttons independently in
+your layout:
+
+``` r
+ui <- bslib::page_fluid(
+  bslib::layout_columns(
+    col_widths = c(2, 10),
+    div(
+      flexible_table_ui("my_table")$add_row_button,
+      br(),
+      flexible_table_ui("my_table")$reset_button
+    ),
+    flexible_table_ui("my_table")$table
+  )
+)
+```
+
+If you want all three elements together in one place,
+`do.call(tagList, ...)` works as a shortcut:
+
+``` r
+ui <- bslib::page_fluid(
+  do.call(tagList, flexible_table_ui("my_table"))
+)
+```
+
+### Wiring up the server
+
+`flexible_table_server()` returns a **reactive data frame** of the
+current table contents. The default behavior is to exclude rows where
+every cell in blank. This feature can be controlled through a parameter
+called `duplicates_allowed`. The default value for `duplicates_allowed`
+is `FALSE`.
+
+``` r
+server <- function(input, output, session) {
+
+  selected <- flexible_table_server(
+    id        = "my_table",
+    duplicates_allowed = FALSE,
+    col_specs = col_specs
+  )
+
+  # selected() is a reactive data frame â use it like any other reactive
+  observe({
+    print(selected())
+  })
+
+}
+```
+
+### Example with Duplicates Allowed
+
+In the above example, you can see that a user can add as many
+â€˜siblingsâ€™ or â€˜mothersâ€™ or â€˜fathersâ€™ as they like. If,
+however, you want to disallow duplicates, you can do that as well.
+
+``` r
+library(shiny)
+library(bslib)
+library(reactableShiny)
+
+home_occupants <- c("mother", "father", "grandmother", "grandfather", "sibling", "sibling (male)", "sibling (female)", "step-mother", "step-father", "partner", "spouse")
+
+col_specs <- list(
+  list(
+    name    = "home_occupant_id",
+    label   = "Home Occupants",
+    choices = setNames(
+      c(1:length(home_occupants)),
+      home_occupants
+    )
+  )
+)
+
+ui <- page_fluid(
+  do.call(tagList, flexible_table_ui("example")),
+  verbatimTextOutput("result")
+)
+
+server <- function(input, output, session) {
+  selected <- flexible_table_server("example", col_specs, duplicates_allowed = FALSE)
+
+  output$result <- renderPrint(selected())
+}
+
+shinyApp(ui, server)
+```
+
+------------------------------------------------------------------------
+
+## Pre-populating with `initial_data`
+
+Pass a reactive data frame to `initial_data` to pre-fill the table. This
+is useful when editing an existing record â€” you load the saved values
+into the table, the user makes changes, and you read the updated values
+back out.
+
+``` r
+server <- function(input, output, session) {
+
+  # A reactive that returns the data to load â could come from a database,
+  # a file, or another reactive in your app
+
+
+  selected <- flexible_table_server(
+    id           = "my_table",
+    col_specs    = col_specs,
+    initial_data = existing_data
+  )
+
+}
+```
+
+``` r
+library(shiny)
+library(bslib)
+library(reactableShiny)
+
+
+home_occupants <- c("mother",
+  "father",
+  "grandmother",
+  "grandfather",
+  "sibling",
+  "sibling (male)",
+  "sibling (female)",
+  "step-mother",
+  "step-father",
+  "partner",
+  "spouse")
+
+
+
+
+col_specs <- list(
+  list(
+    name    = "home_occupant_id",
+    label   = "Home Occupants",
+    choices = setNames(
+      c(1:length(home_occupants)),
+      home_occupants
+    )
+  )
+)
+
+ui <- page_fluid(
+  do.call(tagList, flexible_table_ui("example")),
+  verbatimTextOutput("result")
+)
+
+server <- function(input, output, session) {
+    existing_data <- reactive({
+    data.frame(
+      home_occupant_id = c(2,1)
+    )
+  })
+    
+  selected <- flexible_table_server(
+    "example", 
+    col_specs, 
+    initial_data = existing_data,
+    duplicates_allowed = FALSE)
+
+  output$result <- renderPrint(selected())
+}
+
+shinyApp(ui, server)
+```
+
+Column names in `initial_data` must match the `name` fields in
+`col_specs`.
+
+`initial_data` is **reactive** â€” if the reactive expression fires
+again (for example, because the user switches to a different record),
+the table is replaced with the new data automatically.
+
+### Resetting to a blank table
+
+Passing a data frame with zero rows triggers a reset to a single blank
+row. This is useful when switching from edit mode to add mode:
+
+``` r
+existing_data <- reactive({
+  if (input$mode == "add") {
+    data.frame()          # zero rows â signals a reset
+  } else {
+    load_record(input$record_id)
+  }
+})
+```
+
+------------------------------------------------------------------------
+
+## Options
+
+### `duplicates_allowed`
+
+Set `duplicates_allowed = FALSE` to silently remove duplicate rows from
+the returned data frame. Two rows are considered duplicates if every
+column value is identical:
+
+``` r
+selected <- flexible_table_server(
+  id                 = "my_table",
+  col_specs          = col_specs,
+  duplicates_allowed = FALSE
+)
+```
+
+Note that duplicates are only removed from the *returned* reactive â€”
+the user can still see and interact with them in the table itself.
+
+### `complete_rows_only`
+
+By default the module returns rows where **at least one** value has been
+chosen. Completely empty rows â€” such as the initial blank row before
+the user touches anything â€” are excluded.
+
+If your downstream code requires every column to be filled in, set
+`complete_rows_only = TRUE`:
+
+``` r
+selected <- flexible_table_server(
+  id                 = "my_table",
+  col_specs          = col_specs,
+  complete_rows_only = TRUE
+)
+```
+
+The table below summarises how each setting affects which rows are
+returned:
+
+| `complete_rows_only` | Rows returned                             |
+|----------------------|-------------------------------------------|
+| `FALSE` (default)    | Any row with at least one non-blank value |
+| `TRUE`               | Only rows where every column is filled in |
+
+### Combining both options
+
+The two options compose independently:
+
+``` r
+selected <- flexible_table_server(
+  id                 = "my_table",
+  col_specs          = col_specs,
+  duplicates_allowed = FALSE,
+  complete_rows_only = TRUE
+)
+```
+
+This returns only fully complete rows, with any duplicates among them
+removed.
+
+------------------------------------------------------------------------
+
+## Applying a custom theme
+
+The table uses `theme_bare` by default â€” a minimal transparent theme
+that inherits styling from the surrounding page. To apply a different
+[`reactable::reactableTheme()`](https://glin.github.io/reactable/reference/reactableTheme.html),
+pass it to `reactable_theme`:
+
+``` r
+my_theme <- reactable::reactableTheme(
+  backgroundColor = "#f8f9fa",
+  borderColor     = "#dee2e6"
+)
+
+selected <- flexible_table_server(
+  id              = "my_table",
+  col_specs       = col_specs,
+  reactable_theme = my_theme
+)
+```

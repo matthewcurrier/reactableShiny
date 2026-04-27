@@ -1,0 +1,55 @@
+# reactable.shiny
+
+The goal of reactableShiny is to combine the unique features of the
+reactable package with shiny inputs so that users can more easily write
+data to databases.
+
+## Installation
+
+You can install the development version of reactableShiny from
+[GitHub](https://github.com/) with:
+
+``` r
+# install.packages("pak")
+pak::pak("matthewcurrier/reactableShiny")
+```
+
+# Package index
+
+## All functions
+
+- [`annotator_enriched_server()`](https://matthewcurrier.github.io/reactableShiny/reference/annotator_enriched_server.md)
+  : Enriched annotator — server
+- [`annotator_enriched_ui()`](https://matthewcurrier.github.io/reactableShiny/reference/annotator_enriched_ui.md)
+  : Enriched annotator — UI
+- [`annotator_super_simple_server()`](https://matthewcurrier.github.io/reactableShiny/reference/annotator_super_simple_server.md)
+  : Super simple annotator — server
+- [`annotator_super_simple_ui()`](https://matthewcurrier.github.io/reactableShiny/reference/annotator_super_simple_ui.md)
+  : Super simple annotator — UI
+- [`annotator_table_server()`](https://matthewcurrier.github.io/reactableShiny/reference/annotator_table_server.md)
+  : Annotator table — server
+- [`annotator_table_ui()`](https://matthewcurrier.github.io/reactableShiny/reference/annotator_table_ui.md)
+  : Annotator table — UI
+- [`flexible_table_server()`](https://matthewcurrier.github.io/reactableShiny/reference/flexible_table_server.md)
+  : Flexible editable table — server
+- [`flexible_table_ui()`](https://matthewcurrier.github.io/reactableShiny/reference/flexible_table_ui.md)
+  : Flexible editable table — UI
+- [`make_badge_renderer()`](https://matthewcurrier.github.io/reactableShiny/reference/make_badge_renderer.md)
+  : Create a badge cell renderer for reactable column definitions
+- [`milestone_tracker_server()`](https://matthewcurrier.github.io/reactableShiny/reference/milestone_tracker_server.md)
+  : Milestone Tracker — Server
+- [`milestone_tracker_ui()`](https://matthewcurrier.github.io/reactableShiny/reference/milestone_tracker_ui.md)
+  : Milestone Tracker — UI
+
+# Articles
+
+### All vignettes
+
+- [Aggregated
+  Summary](https://matthewcurrier.github.io/reactableShiny/articles/aggregated-summary.md):
+- [Annotator
+  Table](https://matthewcurrier.github.io/reactableShiny/articles/annotator_table.md):
+- [Annotator Super
+  Simple](https://matthewcurrier.github.io/reactableShiny/articles/annotator-super-simple.md):
+- [Using the flexible_table
+  module](https://matthewcurrier.github.io/reactableShiny/articles/flexible-table.md):

@@ -1,0 +1,361 @@
+# Annotator Super Simple
+
+## Simple Row Select with Annotator Table
+
+This module is a thin wrapper around the
+[`reactable()`](https://glin.github.io/reactable/reference/reactable.html)
+function from the reactable package. The `annotator_super_simple_ui` and
+`annotator_super_simple_server` functions do just a few things.
+
+- Easier Row Selection - Any field with an individual row will active
+  selection or deselection with just a mouse click
+- It provides a ‘reset all’ button via the ui portion of the module.
+- It makes server side filtering easier.
+- If you filter rows of the table and make a selections those selected
+  rows persist.
+
+``` shinylive-r
+#| '!! shinylive warning !!': |
+#|   shinylive does not work in self-contained HTML documents.
+#|   Please set `embed-resources: false` in your metadata.
+#| standalone: true
+#| viewerHeight: 600
+#| components: [editor, viewer]
+library(shiny)
+library(reactable)
+
+theme_bare <- reactable::reactableTheme(
+  borderColor = "transparent",
+  headerStyle = list(borderBottom = "none", fontWeight = "normal"),
+  backgroundColor = "transparent"
+)
+
+# ── Module UI ──────────────────────────────────────────────────────────────────
+annotator_super_simple_ui <- function(id) {
+  ns <- NS(id)
+  list(
+    table = reactableOutput(ns("table")),
+    reset_button = actionButton(
+      ns("reset"),
+      label = tagList(bsicons::bs_icon("arrow-counterclockwise"), " Clear All"),
+      class = "btn-secondary btn-sm"
+    )
+  )
+}
+
+# ── Module Server ──────────────────────────────────────────────────────────────
+annotator_super_simple_server <- function(
+  id,
+  source_data,
+  row_id,
+  display_cols,
+  selection = "multiple",
+  reactable_options = list()
+) {
+  moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+    element_id <- ns("table")
+    selected_ids <- reactiveVal(character(0))
+
+    observeEvent(input$reset, {
+      reactable::updateReactable("table", selected = NA, session = session)
+    }, ignoreInit = TRUE)
+
+    observeEvent(
+      reactable::getReactableState("table", "selected", session),
+      {
+        indices   <- reactable::getReactableState("table", "selected", session)
+        data      <- isolate(source_data())
+        visible_ids <- as.character(data[[row_id]])
+        current   <- selected_ids()
+
+        if (is.null(indices)) {
+          selected_ids(setdiff(current, visible_ids))
+        } else {
+          new_ids <- visible_ids[indices]
+          selected_ids(union(setdiff(current, visible_ids), new_ids))
+        }
+      },
+      ignoreNULL = FALSE,
+      ignoreInit = TRUE
+    )
+
+    output$table <- renderReactable({
+      data        <- source_data()
+      visible_ids <- as.character(data[[row_id]])
+      current_selected <- isolate(selected_ids())
+      default_selected <- which(visible_ids %in% current_selected)
+      if (length(default_selected) == 0) default_selected <- NULL
+
+      render_data <- cbind(
+        data.frame(Select = NA_character_, stringsAsFactors = FALSE),
+        data[, display_cols, drop = FALSE]
+      )
+
+      col_defs <- c(
+        list(
+          .selection = colDef(show = FALSE),
+          Select = colDef(
+            name  = "",
+            width = 45,
+            html  = TRUE,
+            cell  = reactable::JS(
+              "function(cellInfo) {
+                 const checked = cellInfo.selected ? 'checked' : '';
+                 return '<input type=\"checkbox\" ' + checked +
+                        ' aria-label=\"Select row\"' +
+                        ' style=\"width:16px;height:16px;cursor:pointer;' +
+                        'accent-color:#0d6efd;\">';
+               }"
+            )
+          )
+        ),
+        setNames(lapply(display_cols, function(x) colDef()), display_cols)
+      )
+
+      do.call(
+        reactable,
+        c(
+          list(
+            data            = render_data,
+            selection       = selection,
+            onClick         = "select",
+            rowStyle        = list(cursor = "pointer"),
+            columns         = col_defs,
+            defaultSelected = default_selected,
+            elementId       = element_id
+          ),
+          reactable_options
+        )
+      )
+    })
+
+    reactive({
+      ids         <- selected_ids()
+      data        <- source_data()
+      visible_ids <- as.character(data[[row_id]])
+      intersect(ids, visible_ids)
+    })
+  })
+}
+
+# ── App ────────────────────────────────────────────────────────────────────────
+mtcars_data <- mtcars
+mtcars_data$car <- rownames(mtcars)
+rownames(mtcars_data) <- NULL
+
+display_cols <- c("car", "mpg", "cyl", "hp", "wt")
+
+ui_els <- annotator_super_simple_ui("demo")
+
+ui <- fluidPage(
+  titlePanel("mtcars Explorer"),
+  fluidRow(
+    column(2, ui_els$reset_button),
+    column(10)
+  ),
+  br(),
+  ui_els$table,
+  br(),
+  strong("Selected cars:"),
+  verbatimTextOutput("selected_out")
+)
+
+server <- function(input, output, session) {
+  selected <- annotator_super_simple_server(
+    id           = "demo",
+    source_data  = reactive(mtcars_data),
+    row_id       = "car",
+    display_cols = display_cols
+  )
+
+  output$selected_out <- renderPrint({
+    ids <- selected()
+    if (length(ids) == 0) cat("None") else cat(ids, sep = "\n")
+  })
+}
+
+shinyApp(ui, server)
+```
+
+This example illustrates the use of a shiny filter to filter rows.
+
+``` shinylive-r
+#| '!! shinylive warning !!': |
+#|   shinylive does not work in self-contained HTML documents.
+#|   Please set `embed-resources: false` in your metadata.
+#| standalone: true
+#| viewerHeight: 600
+#| components: [editor, viewer]
+#| column: screen-inset
+library(shiny)
+library(reactable)
+
+theme_bare <- reactable::reactableTheme(
+  borderColor = "transparent",
+  headerStyle = list(borderBottom = "none", fontWeight = "normal"),
+  backgroundColor = "transparent"
+)
+
+annotator_super_simple_ui <- function(id) {
+  ns <- NS(id)
+  list(
+    table = reactableOutput(ns("table")),
+    reset_button = actionButton(
+      ns("reset"),
+      label = tagList(bsicons::bs_icon("arrow-counterclockwise"), " Clear All"),
+      class = "btn-secondary btn-sm"
+    )
+  )
+}
+
+annotator_super_simple_server <- function(
+  id,
+  source_data,
+  row_id,
+  display_cols,
+  selection = "multiple",
+  reactable_options = list()
+) {
+  moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+    selected_ids <- reactiveVal(character(0))
+
+    observeEvent(input$reset, {
+      selected_ids(character(0))
+      reactable::updateReactable("table", selected = NA, session = session)
+    }, ignoreInit = TRUE)
+
+    observeEvent(
+      reactable::getReactableState("table", "selected", session),
+      {
+        indices     <- reactable::getReactableState("table", "selected", session)
+        data        <- isolate(source_data())
+        visible_ids <- as.character(data[[row_id]])
+        current     <- selected_ids()
+
+        if (is.null(indices)) {
+          selected_ids(setdiff(current, visible_ids))
+        } else {
+          new_ids <- visible_ids[indices]
+          selected_ids(union(setdiff(current, visible_ids), new_ids))
+        }
+      },
+      ignoreNULL = FALSE,
+      ignoreInit = TRUE
+    )
+
+    output$table <- renderReactable({
+      data             <- source_data()
+      visible_ids      <- as.character(data[[row_id]])
+      current_selected <- isolate(selected_ids())
+      default_selected <- which(visible_ids %in% current_selected)
+      if (length(default_selected) == 0) default_selected <- NULL
+
+      render_data <- cbind(
+        data.frame(Select = NA_character_, stringsAsFactors = FALSE),
+        data[, display_cols, drop = FALSE]
+      )
+
+      col_defs <- c(
+        list(
+          .selection = colDef(show = FALSE),
+          Select = colDef(
+            name  = "",
+            width = 45,
+            html  = TRUE,
+            cell  = reactable::JS(
+              "function(cellInfo) {
+                 const checked = cellInfo.selected ? 'checked' : '';
+                 return '<input type=\"checkbox\" ' + checked +
+                        ' aria-label=\"Select row\"' +
+                        ' style=\"width:16px;height:16px;cursor:pointer;' +
+                        'accent-color:#0d6efd;\">';
+               }"
+            )
+          )
+        ),
+        setNames(lapply(display_cols, function(x) colDef()), display_cols)
+      )
+
+      do.call(
+        reactable,
+        c(
+          list(
+            data            = render_data,
+            selection       = selection,
+            onClick         = "select",
+            rowStyle        = list(cursor = "pointer"),
+            columns         = col_defs,
+            defaultSelected = default_selected,
+            theme           = theme_bare
+          ),
+          reactable_options
+        )
+      )
+    })
+
+    reactive({
+      ids         <- selected_ids()
+      data        <- source_data()
+      visible_ids <- as.character(data[[row_id]])
+      intersect(ids, visible_ids)
+    })
+  })
+}
+
+# ── App ─────────────────────────────────────────────────────────────────
+mtcars_data      <- mtcars
+mtcars_data$car  <- rownames(mtcars)
+rownames(mtcars_data) <- NULL
+display_cols <- c("car", "mpg", "cyl", "hp", "wt")
+
+ui_els <- annotator_super_simple_ui("demo")
+
+ui <- fluidPage(
+  titlePanel("mtcars Explorer"),
+  fluidRow(
+    column(3,
+      selectInput(
+        "cyl_filter",
+        "Filter by cylinders",
+        choices  = c("All" = "all", "4" = "4", "6" = "6", "8" = "8"),
+        selected = "all"
+      )
+    ),
+    column(3, br(), ui_els$reset_button),
+    column(6)
+  ),
+  ui_els$table,
+  br(),
+  strong("Selected cars:"),
+  verbatimTextOutput("selected_out")
+)
+
+server <- function(input, output, session) {
+
+  # source_data is now reactive — it changes when the filter changes.
+  # This is what exercises the module's persistence logic.
+  filtered_data <- reactive({
+    if (input$cyl_filter == "all") {
+      mtcars_data
+    } else {
+      mtcars_data[mtcars_data$cyl == as.integer(input$cyl_filter), ]
+    }
+  })
+
+  selected <- annotator_super_simple_server(
+    id           = "demo",
+    source_data  = filtered_data,
+    row_id       = "car",
+    display_cols = display_cols
+  )
+
+  output$selected_out <- renderPrint({
+    ids <- selected()
+    if (length(ids) == 0) cat("None") else cat(ids, sep = "\n")
+  })
+}
+
+shinyApp(ui, server)
+```

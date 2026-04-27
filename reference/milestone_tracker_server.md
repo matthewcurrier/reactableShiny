@@ -1,0 +1,115 @@
+# Milestone Tracker — Server
+
+Milestone Tracker — Server
+
+## Usage
+
+``` r
+milestone_tracker_server(
+  id,
+  data,
+  row_id,
+  group_col,
+  group_sort_col = NULL,
+  item_col,
+  badge_col = NULL,
+  badge_colors = NULL,
+  annotation_col_specs,
+  card1_title = "Select Items",
+  card2_title = "Annotations",
+  group_label = NULL,
+  item_label = NULL,
+  count_label = "items",
+  card1_reactable_options = list()
+)
+```
+
+## Arguments
+
+- id:
+
+  \`character(1)\`. Shiny module namespace ID.
+
+- data:
+
+  \`reactive\`. A reactive returning the source data frame. Must contain
+  \`row_id\`, \`group_col\`, \`item_col\`, and optionally \`badge_col\`.
+
+- row_id:
+
+  \`character(1)\`. Name of the unique ID column in \`data\` (e.g.
+  \`"id"\`).
+
+- group_col:
+
+  \`character(1)\`. Column to group rows by in Card 1 (e.g. \`"age"\`).
+  Clicking a group header expands its rows.
+
+- group_sort_col:
+
+  \`character(1)\` or \`NULL\`. Column used to sort the groups (e.g.
+  \`"age_months"\`). When \`NULL\`, groups sort by \`group_col\`.
+
+- item_col:
+
+  \`character(1)\`. Column containing the item text shown in each row
+  (e.g. \`"milestone"\`).
+
+- badge_col:
+
+  \`character(1)\` or \`NULL\`. Column rendered as a coloured badge in
+  Card 1 (e.g. \`"category"\`). \`NULL\` disables badge rendering.
+
+- badge_colors:
+
+  Named list or \`NULL\`. Maps badge values to \`list(bg = "#hex", text
+  = "#hex")\` colour specs. Required when \`badge_col\` is not \`NULL\`.
+  Also used to colour the per-group selection summary badges in Card 1 —
+  when a group name matches a key in \`badge_colors\`, that colour is
+  applied; otherwise a neutral green fallback is used.
+
+- annotation_col_specs:
+
+  \`list\`. Full col_specs list passed to \[annotator_table_server()\]
+  for Card 2. Include display col_specs for columns you want to show
+  from the selected data, followed by input col_specs for annotation
+  fields (select, checkbox, text, etc.). Use \[make_badge_renderer()\]
+  to obtain a cell renderer consistent with Card 1 for any display
+  col_spec that shows a badge column.
+
+- card1_title:
+
+  \`character(1)\`. Header text for Card 1.
+
+- card2_title:
+
+  \`character(1)\`. Header text for Card 2.
+
+- group_label:
+
+  \`character(1)\` or \`NULL\`. Display label for the group column.
+  Defaults to \`group_col\`.
+
+- item_label:
+
+  \`character(1)\` or \`NULL\`. Display label for the item column.
+  Defaults to \`item_col\`.
+
+- count_label:
+
+  \`character(1)\`. Suffix used in the aggregate row count (e.g.
+  \`"milestones"\` → \`"5 milestones"\`).
+
+- card1_reactable_options:
+
+  \`list\`. Additional arguments passed to \[reactable::reactable()\]
+  for Card 1 via \[base::do.call()\]. Do not include \`data\`,
+  \`groupBy\`, \`selection\`, \`onClick\`, or \`columns\` — these are
+  owned by the module. Useful for overriding \`defaultPageSize\`,
+  \`sortable\`, \`theme\`, etc.
+
+## Value
+
+A \[shiny::reactive()\] returning a data frame of row IDs and annotation
+values for rows where at least one input has been touched. Passes
+through the return value of \[annotator_table_server()\].

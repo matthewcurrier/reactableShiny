@@ -1,0 +1,374 @@
+# Aggregated Summary
+
+`reactableShiny` provides four Shiny modules that layer interactive
+inputs on top of [reactable](https://glin.github.io/reactable/) tables.
+Each module follows the same two-function pattern — a `*_ui()` function
+and a `*_server()` function — and returns a reactive that your app can
+consume downstream.
+
+Custom visual overrides belong in `www/custom.css`, which Shiny serves
+automatically.
+
+------------------------------------------------------------------------
+
+## 1. `flexible_table` — user-built editable rows
+
+**When to use it.** The user constructs a table from scratch by choosing
+from dropdowns, typing free text, or entering dates. Rows can be added,
+deleted, and reset. Use this when the dataset does not exist yet and the
+user is the author.
+
+[`flexible_table_ui()`](https://matthewcurrier.github.io/reactableShiny/reference/flexible_table_ui.md)
+returns a **named list** (`table`, `add_row_button`, `reset_button`) so
+each element can be placed anywhere in your layout independently.
+
+``` r
+library(shiny)
+library(bslib)
+library(reactableShiny)
+
+variety_map <- list(
+  apple  = c("Fuji" = "fuji", "Gala" = "gala"),
+  banana = c("Cavendish" = "cavendish"),
+  pear   = c("Bosc" = "bosc", "Bartlett" = "bartlett")
+)
+
+col_specs <- list(
+  list(
+    name    = "fruit",
+    label   = "Fruit",
+    type    = "select",
+    choices = c("Select..." = "", "Apple" = "apple",
+                "Banana" = "banana", "Pear" = "pear")
+  ),
+  list(
+    name                 = "variety",
+    label                = "Variety",
+    type                 = "select",
+    choices              = c("Select..." = ""),
+    depends_on           = "fruit",
+    get_filtered_choices = function(val) {
+      c("Select..." = "", variety_map[[val]] %||% character(0))
+    }
+  ),
+  list(
+    name        = "notes",
+    label       = "Notes",
+    type        = "text",
+    placeholder = "Optional...",
+    width       = 220
+  )
+)
+
+ui <- page_sidebar(
+  sidebar = sidebar(
+    flexible_table_ui("picker")$add_row_button,
+    br(),
+    flexible_table_ui("picker")$reset_button
+  ),
+  flexible_table_ui("picker")$table,
+  card(
+    card_header("Selected (complete rows only)"),
+    verbatimTextOutput("flexible_result")
+  )
+)
+
+server <- function(input, output, session) {
+  selected <- flexible_table_server(
+    id                 = "picker",
+    col_specs          = col_specs,
+    duplicates_allowed = FALSE
+  )
+  output$flexible_result <- renderPrint(selected())
+}
+
+shinyApp(ui, server)
+```
+
+**Column spec quick reference**
+
+| Field                  | Required?   | Purpose                                              |
+|------------------------|-------------|------------------------------------------------------|
+| `name`                 | Yes         | Data frame column name & Shiny input ID prefix       |
+| `label`                | Yes         | Header text                                          |
+| `type`                 | No\*        | `"select"` (default), `"text"`, `"date"`             |
+| `choices`              | select      | Named character vector or grouped named list         |
+| `default`              | No          | Pre-filled value for new rows (`""` if omitted)      |
+| `width`                | No          | Column width in pixels                               |
+| `depends_on`           | No          | Name of a parent column whose value filters this one |
+| `get_filtered_choices` | conditional | `function(parent_value)` returning a choices vector  |
+
+\*Omitting `type` defaults to `"select"` for backward compatibility.
+
+The server returns a reactive **data frame of complete, non-blank
+rows**. Internal helper columns (`id`, `delete`) are stripped
+automatically. Pass `initial_data = reactive(df)` to pre-populate on
+startup.
+
+------------------------------------------------------------------------
+
+## 2. `annotator_super_simple` — lightweight row selection
+
+**When to use it.** You have an existing data frame and want the user to
+flag a subset of rows with a single click. No per-cell inputs — the only
+output is a character vector of selected row IDs.
+
+[`annotator_super_simple_ui()`](https://matthewcurrier.github.io/reactableShiny/reference/annotator_super_simple_ui.md)
+returns a named list (`table`, `reset_button`).
+
+``` r
+library(shiny)
+library(bslib)
+library(reactableShiny)
+
+queue <- reactive({
+  data.frame(
+    id      = 1:6,
+    patient = c("Alice", "Bob", "Carol", "Dave", "Eve", "Frank"),
+    status  = c("pending", "urgent", "pending", "done", "urgent", "pending"),
+    age     = c(34, 52, 29, 61, 45, 38),
+    stringsAsFactors = FALSE
+  )
+})
+
+ui <- page_sidebar(
+  sidebar = sidebar(
+    annotator_super_simple_ui("review")$reset_button
+  ),
+  annotator_super_simple_ui("review")$table,
+  card(
+    card_header("Selected IDs"),
+    verbatimTextOutput("simple_result")
+  )
+)
+
+server <- function(input, output, session) {
+  selected_ids <- annotator_super_simple_server(
+    id                = "review",
+    source_data       = queue,
+    row_id            = "id",
+    display_cols      = c("patient", "status", "age"),
+    selection         = "multiple",
+    reactable_options = list(searchable = TRUE, striped = TRUE)
+  )
+  output$simple_result <- renderPrint(selected_ids())
+}
+
+shinyApp(ui, server)
+```
+
+**Key behaviour notes**
+
+- Selections persist across reactive updates to `source_data`. If a row
+  disappears (e.g. due to a filter) and reappears, it stays selected.
+- The return value contains only IDs *currently visible* in
+  `source_data`.
+- Pass additional
+  [`reactable()`](https://glin.github.io/reactable/reference/reactable.html)
+  arguments via `reactable_options = list(...)`. Do not include `data`,
+  `selection`, `onClick`, `rowStyle`, `columns`, `defaultSelected`,
+  `elementId`, or `theme` — these are owned by the module.
+
+------------------------------------------------------------------------
+
+## 3. `annotator_table` — per-row structured annotation
+
+**When to use it.** You have an existing data frame and want the user to
+fill in structured metadata for each row: dropdowns, checkboxes, text
+fields, numbers, or radio buttons.
+
+[`annotator_table_ui()`](https://matthewcurrier.github.io/reactableShiny/reference/annotator_table_ui.md)
+returns a single
+[`reactableOutput()`](https://glin.github.io/reactable/reference/reactable-shiny.html)
+element.
+
+The example below also demonstrates **gating**: the `notes` field is
+greyed out and non-interactive until the `approved` checkbox in the same
+row is checked.
+
+``` r
+library(shiny)
+library(bslib)
+library(reactableShiny)
+
+source_data <- reactive({
+  data.frame(
+    car = c("Mazda RX4", "Hornet 4 Drive", "Valiant", "Merc 240D", "Fiat 128"),
+    mpg = c(21.0, 21.4, 18.1, 24.4, 32.4),
+    stringsAsFactors = FALSE
+  )
+})
+
+col_specs <- list(
+  list(name = "car", type = "display", label = "Car"),
+  list(name = "mpg", type = "display", label = "MPG"),
+  list(
+    name    = "category",
+    type    = "select",
+    label   = "Category",
+    choices = c("Economy" = "economy", "Sport" = "sport", "Luxury" = "luxury")
+  ),
+  list(name = "approved", type = "checkbox", label = "Approved?"),
+  list(
+    name        = "notes",
+    type        = "text",
+    label       = "Notes",
+    placeholder = "Reason for approval...",
+    gates       = "approved"
+  )
+)
+
+ui <- page_fluid(
+  h4("Car Annotation"),
+  annotator_table_ui("cars"),
+  br(),
+  card(
+    card_header("Touched rows only"),
+    verbatimTextOutput("annotator_result")
+  )
+)
+
+server <- function(input, output, session) {
+  result <- annotator_table_server(
+    id          = "cars",
+    source_data = source_data,
+    row_id      = "car",
+    col_specs   = col_specs
+  )
+  output$annotator_result <- renderPrint(result())
+}
+
+shinyApp(ui, server)
+```
+
+**Column type reference**
+
+| `type`                | Widget                                 | Extra required fields |
+|-----------------------|----------------------------------------|-----------------------|
+| `"display"`           | Read-only text                         | —                     |
+| `"clickable_display"` | Clickable cell that toggles a checkbox | `toggles`             |
+| `"select"`            | Dropdown                               | `choices`             |
+| `"checkbox"`          | Checkbox                               | —                     |
+| `"text_checkbox"`     | Clickable label + checkbox             | `display_col`         |
+| `"text"`              | Free-text input                        | —                     |
+| `"number"`            | Numeric input                          | —                     |
+| `"radio"`             | Radio button group                     | `choices`             |
+
+All types accept `label`, `width`, `col_def_options`, and `gates` (the
+name of a checkbox column that controls this input’s interactivity).
+
+The server returns a reactive **data frame of the `row_id` column plus
+all input annotation columns**, filtered to rows where at least one
+input has been touched. Display columns are excluded. Pass
+`initial_values = reactive(df)` to pre-seed annotations.
+
+------------------------------------------------------------------------
+
+## 4. `milestone_tracker` — two-panel select-then-annotate
+
+**When to use it.** Your data is grouped (age bands, project phases,
+departments) and you want the user to first pick items from a grouped
+table on the left, then annotate only those selected items on the right.
+This module composes `annotator_table` internally.
+
+[`milestone_tracker_ui()`](https://matthewcurrier.github.io/reactableShiny/reference/milestone_tracker_ui.md)
+returns a complete two-column `bslib` layout — no individual element
+placement needed.
+
+``` r
+library(shiny)
+library(bslib)
+library(reactableShiny)
+
+milestones <- reactive({
+  data.frame(
+    id         = 1:8,
+    age        = c("6 months",  "6 months",  "12 months", "12 months",
+                   "18 months", "18 months", "24 months", "24 months"),
+    age_months = c(6, 6, 12, 12, 18, 18, 24, 24),
+    milestone  = c(
+      "Sits with support", "Babbles",
+      "Pulls to stand",    "Says mama",
+      "Walks alone",       "Points to objects",
+      "Runs steadily",     "Uses 2-word phrases"
+    ),
+    domain     = c("Motor", "Language", "Motor", "Language",
+                   "Motor", "Language", "Motor", "Language"),
+    stringsAsFactors = FALSE
+  )
+})
+
+annotation_specs <- list(
+  list(name = "milestone", type = "display", label = "Milestone"),
+  list(name = "domain",    type = "display", label = "Domain"),
+  list(
+    name    = "status",
+    type    = "select",
+    label   = "Status",
+    choices = c(
+      "Achieved" = "achieved",
+      "Emerging" = "emerging",
+      "Not yet"  = "not_yet"
+    )
+  ),
+  list(name = "notes", type = "text", label = "Notes")
+)
+
+ui <- page_fluid(
+  milestone_tracker_ui("tracker"),
+  br(),
+  card(
+    card_header("Touched annotations"),
+    verbatimTextOutput("tracker_result")
+  )
+)
+
+server <- function(input, output, session) {
+  result <- milestone_tracker_server(
+    id                   = "tracker",
+    data                 = milestones,
+    row_id               = "id",
+    group_col            = "age",
+    group_sort_col       = "age_months",
+    item_col             = "milestone",
+    badge_col            = "domain",
+    badge_colors         = list(
+      Motor    = list(bg = "#EAF3DE", text = "#27500A"),
+      Language = list(bg = "#DEE9F3", text = "#0A2750")
+    ),
+    annotation_col_specs = annotation_specs,
+    card1_title          = "Select Milestones",
+    card2_title          = "Record Progress",
+    count_label          = "milestones"
+  )
+  output$tracker_result <- renderPrint(result())
+}
+
+shinyApp(ui, server)
+```
+
+**Key behaviour notes**
+
+- Clicking a group header row in Card 1 selects *all* rows in that
+  group.
+- Card 2 only appears once at least one row is selected.
+- Annotation state is preserved when a row is deselected and
+  re-selected.
+- `group_sort_col` controls group sort order (hidden from display). When
+  `NULL`, groups sort alphabetically by `group_col`.
+
+------------------------------------------------------------------------
+
+## Quick reference
+
+| Module                   | Source data | Returns                                                       |
+|--------------------------|-------------|---------------------------------------------------------------|
+| `flexible_table`         | User-built  | `data.frame` of complete, non-blank rows                      |
+| `annotator_super_simple` | Provided    | `character` vector of selected row IDs                        |
+| `annotator_table`        | Provided    | `data.frame` of touched annotation rows                       |
+| `milestone_tracker`      | Provided    | `data.frame` of touched annotation rows (selected items only) |
+
+All server functions accept `reactable_theme` (a `reactableTheme`
+object) and `reactable_options` (a named list of extra
+[`reactable()`](https://glin.github.io/reactable/reference/reactable.html)
+arguments) to customise rendering without modifying module internals.
