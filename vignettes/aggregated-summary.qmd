@@ -3,6 +3,7 @@ title: "Aggregated Summary"
 format:
   html:
     fig-width: 8
+    embed-resources: false
 vignette: >
   %\VignetteIndexEntry{Aggregated Summary}
   %\VignetteEngine{quarto::html}

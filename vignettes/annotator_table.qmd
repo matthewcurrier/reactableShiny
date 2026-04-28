@@ -4,6 +4,7 @@ format:
   html:
     fig-width: 8
     column: screen-inset
+    embed-resources: false
 vignette: >
   %\VignetteIndexEntry{Annotator Table}
   %\VignetteEngine{quarto::html}
