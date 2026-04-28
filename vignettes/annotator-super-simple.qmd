@@ -4,7 +4,6 @@ format:
   html:
     fig-width: 11.5
     column: screen-inset
-    embed-resources: false
 vignette: >
   %\VignetteIndexEntry{annotator-super-simple}
   %\VignetteEngine{quarto::html}
@@ -29,131 +28,16 @@ This module is a thin wrapper around the `reactable()` function from the reactab
 *  It makes server side filtering easier. 
 *  If you filter rows of the table and make a selections those selected rows persist.
 
-```{shinylive-r}
-#| standalone: true
-#| viewerHeight: 600
-#| components: [editor, viewer]
+The basic pattern is straightforward — pass a reactive data frame, name the
+row-ID column, and list the columns to display:
+
+```{r basic-example, eval=FALSE}
 library(shiny)
 library(reactable)
+library(reactableShiny)
 
-theme_bare <- reactable::reactableTheme(
-  borderColor = "transparent",
-  headerStyle = list(borderBottom = "none", fontWeight = "normal"),
-  backgroundColor = "transparent"
-)
-
-# ── Module UI ──────────────────────────────────────────────────────────────────
-annotator_super_simple_ui <- function(id) {
-  ns <- NS(id)
-  list(
-    table = reactableOutput(ns("table")),
-    reset_button = actionButton(
-      ns("reset"),
-      label = tagList(bsicons::bs_icon("arrow-counterclockwise"), " Clear All"),
-      class = "btn-secondary btn-sm"
-    )
-  )
-}
-
-# ── Module Server ──────────────────────────────────────────────────────────────
-annotator_super_simple_server <- function(
-  id,
-  source_data,
-  row_id,
-  display_cols,
-  selection = "multiple",
-  reactable_options = list()
-) {
-  moduleServer(id, function(input, output, session) {
-    ns <- session$ns
-    element_id <- ns("table")
-    selected_ids <- reactiveVal(character(0))
-
-    observeEvent(input$reset, {
-      reactable::updateReactable("table", selected = NA, session = session)
-    }, ignoreInit = TRUE)
-
-    observeEvent(
-      reactable::getReactableState("table", "selected", session),
-      {
-        indices   <- reactable::getReactableState("table", "selected", session)
-        data      <- isolate(source_data())
-        visible_ids <- as.character(data[[row_id]])
-        current   <- selected_ids()
-
-        if (is.null(indices)) {
-          selected_ids(setdiff(current, visible_ids))
-        } else {
-          new_ids <- visible_ids[indices]
-          selected_ids(union(setdiff(current, visible_ids), new_ids))
-        }
-      },
-      ignoreNULL = FALSE,
-      ignoreInit = TRUE
-    )
-
-    output$table <- renderReactable({
-      data        <- source_data()
-      visible_ids <- as.character(data[[row_id]])
-      current_selected <- isolate(selected_ids())
-      default_selected <- which(visible_ids %in% current_selected)
-      if (length(default_selected) == 0) default_selected <- NULL
-
-      render_data <- cbind(
-        data.frame(Select = NA_character_, stringsAsFactors = FALSE),
-        data[, display_cols, drop = FALSE]
-      )
-
-      col_defs <- c(
-        list(
-          .selection = colDef(show = FALSE),
-          Select = colDef(
-            name  = "",
-            width = 45,
-            html  = TRUE,
-            cell  = reactable::JS(
-              "function(cellInfo) {
-                 const checked = cellInfo.selected ? 'checked' : '';
-                 return '<input type=\"checkbox\" ' + checked +
-                        ' aria-label=\"Select row\"' +
-                        ' style=\"width:16px;height:16px;cursor:pointer;' +
-                        'accent-color:#0d6efd;\">';
-               }"
-            )
-          )
-        ),
-        setNames(lapply(display_cols, function(x) colDef()), display_cols)
-      )
-
-      do.call(
-        reactable,
-        c(
-          list(
-            data            = render_data,
-            selection       = selection,
-            onClick         = "select",
-            rowStyle        = list(cursor = "pointer"),
-            columns         = col_defs,
-            defaultSelected = default_selected,
-            elementId       = element_id
-          ),
-          reactable_options
-        )
-      )
-    })
-
-    reactive({
-      ids         <- selected_ids()
-      data        <- source_data()
-      visible_ids <- as.character(data[[row_id]])
-      intersect(ids, visible_ids)
-    })
-  })
-}
-
-# ── App ────────────────────────────────────────────────────────────────────────
-mtcars_data <- mtcars
-mtcars_data$car <- rownames(mtcars)
+mtcars_data      <- mtcars
+mtcars_data$car  <- rownames(mtcars)
 rownames(mtcars_data) <- NULL
 
 display_cols <- c("car", "mpg", "cyl", "hp", "wt")
@@ -190,135 +74,22 @@ server <- function(input, output, session) {
 shinyApp(ui, server)
 ```
 
-This example illustrates the use of a shiny filter to filter rows.
+## Filtering with selection persistence
 
-:::{.column-screen-inset}
+Because `source_data` is a reactive expression, you can drive it from any
+filter control. Rows that are selected and then temporarily hidden by a filter
+remain selected when they reappear — the module reconciles visible row indices
+against the stored ID vector on every render.
 
-```{shinylive-r}
-#| standalone: true
-#| viewerHeight: 600
-#| components: [editor, viewer]
-#| column: screen-inset
+```{r filter-example, eval=FALSE}
 library(shiny)
 library(reactable)
+library(reactableShiny)
 
-theme_bare <- reactable::reactableTheme(
-  borderColor = "transparent",
-  headerStyle = list(borderBottom = "none", fontWeight = "normal"),
-  backgroundColor = "transparent"
-)
-
-annotator_super_simple_ui <- function(id) {
-  ns <- NS(id)
-  list(
-    table = reactableOutput(ns("table")),
-    reset_button = actionButton(
-      ns("reset"),
-      label = tagList(bsicons::bs_icon("arrow-counterclockwise"), " Clear All"),
-      class = "btn-secondary btn-sm"
-    )
-  )
-}
-
-annotator_super_simple_server <- function(
-  id,
-  source_data,
-  row_id,
-  display_cols,
-  selection = "multiple",
-  reactable_options = list()
-) {
-  moduleServer(id, function(input, output, session) {
-    ns <- session$ns
-    selected_ids <- reactiveVal(character(0))
-
-    observeEvent(input$reset, {
-      selected_ids(character(0))
-      reactable::updateReactable("table", selected = NA, session = session)
-    }, ignoreInit = TRUE)
-
-    observeEvent(
-      reactable::getReactableState("table", "selected", session),
-      {
-        indices     <- reactable::getReactableState("table", "selected", session)
-        data        <- isolate(source_data())
-        visible_ids <- as.character(data[[row_id]])
-        current     <- selected_ids()
-
-        if (is.null(indices)) {
-          selected_ids(setdiff(current, visible_ids))
-        } else {
-          new_ids <- visible_ids[indices]
-          selected_ids(union(setdiff(current, visible_ids), new_ids))
-        }
-      },
-      ignoreNULL = FALSE,
-      ignoreInit = TRUE
-    )
-
-    output$table <- renderReactable({
-      data             <- source_data()
-      visible_ids      <- as.character(data[[row_id]])
-      current_selected <- isolate(selected_ids())
-      default_selected <- which(visible_ids %in% current_selected)
-      if (length(default_selected) == 0) default_selected <- NULL
-
-      render_data <- cbind(
-        data.frame(Select = NA_character_, stringsAsFactors = FALSE),
-        data[, display_cols, drop = FALSE]
-      )
-
-      col_defs <- c(
-        list(
-          .selection = colDef(show = FALSE),
-          Select = colDef(
-            name  = "",
-            width = 45,
-            html  = TRUE,
-            cell  = reactable::JS(
-              "function(cellInfo) {
-                 const checked = cellInfo.selected ? 'checked' : '';
-                 return '<input type=\"checkbox\" ' + checked +
-                        ' aria-label=\"Select row\"' +
-                        ' style=\"width:16px;height:16px;cursor:pointer;' +
-                        'accent-color:#0d6efd;\">';
-               }"
-            )
-          )
-        ),
-        setNames(lapply(display_cols, function(x) colDef()), display_cols)
-      )
-
-      do.call(
-        reactable,
-        c(
-          list(
-            data            = render_data,
-            selection       = selection,
-            onClick         = "select",
-            rowStyle        = list(cursor = "pointer"),
-            columns         = col_defs,
-            defaultSelected = default_selected,
-            theme           = theme_bare
-          ),
-          reactable_options
-        )
-      )
-    })
-
-    reactive({
-      ids         <- selected_ids()
-      data        <- source_data()
-      visible_ids <- as.character(data[[row_id]])
-      intersect(ids, visible_ids)
-    })
-  })
-}
-
-# ── App ─────────────────────────────────────────────────────────────────
 mtcars_data      <- mtcars
 mtcars_data$car  <- rownames(mtcars)
 rownames(mtcars_data) <- NULL
+
 display_cols <- c("car", "mpg", "cyl", "hp", "wt")
 
 ui_els <- annotator_super_simple_ui("demo")
@@ -370,5 +141,3 @@ server <- function(input, output, session) {
 
 shinyApp(ui, server)
 ```
-
-:::

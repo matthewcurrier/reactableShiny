@@ -1,7 +1,0 @@
-# vignettes/_quarto.yml
-filters:
-  - quarto-ext/shinylive
-format:
-  html:
-    fig-width: 8
-    column: screen-inset
