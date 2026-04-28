@@ -12,8 +12,6 @@
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><script src="annotator-super-simple_files/libs/quarto-html/popper.min.js"></script><script src="annotator-super-simple_files/libs/quarto-html/tippy.umd.min.js"></script><link href="annotator-super-simple_files/libs/quarto-html/tippy.css" rel="stylesheet">
 <link href="annotator-super-simple_files/libs/quarto-html/light-border.css" rel="stylesheet">
-<script src="annotator-super-simple_files/libs/quarto-contrib/shinylive-0.10.8/shinylive/load-shinylive-sw.js" type="module"></script><script src="annotator-super-simple_files/libs/quarto-contrib/shinylive-0.10.8/shinylive/run-python-blocks.js" type="module"></script><link href="annotator-super-simple_files/libs/quarto-contrib/shinylive-0.10.8/shinylive/shinylive.css" rel="stylesheet">
-<link href="annotator-super-simple_files/libs/quarto-contrib/shinylive-quarto-css/shinylive-quarto.css" rel="stylesheet">
 <!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Annotator Super Simple">
 </head>
 <body>
@@ -81,133 +79,15 @@
 <li>It makes server side filtering easier.</li>
 <li>If you filter rows of the table and make a selections those selected rows persist.</li>
 </ul>
-<pre class="shinylive-r" data-engine="r"><code><span><span class="co">#| '!! shinylive warning !!': |</span></span>
-<span><span class="co">#|   shinylive does not work in self-contained HTML documents.</span></span>
-<span><span class="co">#|   Please set `embed-resources: false` in your metadata.</span></span>
-<span><span class="co">#| standalone: true</span></span>
-<span><span class="co">#| viewerHeight: 600</span></span>
-<span><span class="co">#| components: [editor, viewer]</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://shiny.posit.co/" class="external-link">shiny</a></span><span class="op">)</span></span>
+<p>The basic pattern is straightforward — pass a reactive data frame, name the row-ID column, and list the columns to display:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://shiny.posit.co/" class="external-link">shiny</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://glin.github.io/reactable/" class="external-link">reactable</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/matthewcurrier/reactable.shiny" class="external-link">reactableShiny</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">theme_bare</span> <span class="op">&lt;-</span> <span class="fu">reactable</span><span class="fu">::</span><span class="fu"><a href="https://glin.github.io/reactable/reference/reactableTheme.html" class="external-link">reactableTheme</a></span><span class="op">(</span></span>
-<span>  borderColor <span class="op">=</span> <span class="st">"transparent"</span>,</span>
-<span>  headerStyle <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>borderBottom <span class="op">=</span> <span class="st">"none"</span>, fontWeight <span class="op">=</span> <span class="st">"normal"</span><span class="op">)</span>,</span>
-<span>  backgroundColor <span class="op">=</span> <span class="st">"transparent"</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># ── Module UI ──────────────────────────────────────────────────────────────────</span></span>
-<span><span class="va">annotator_super_simple_ui</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">id</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">ns</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/NS.html" class="external-link">NS</a></span><span class="op">(</span><span class="va">id</span><span class="op">)</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>    table <span class="op">=</span> <span class="fu"><a href="https://glin.github.io/reactable/reference/reactable-shiny.html" class="external-link">reactableOutput</a></span><span class="op">(</span><span class="fu">ns</span><span class="op">(</span><span class="st">"table"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>    reset_button <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/actionButton.html" class="external-link">actionButton</a></span><span class="op">(</span></span>
-<span>      <span class="fu">ns</span><span class="op">(</span><span class="st">"reset"</span><span class="op">)</span>,</span>
-<span>      label <span class="op">=</span> <span class="fu"><a href="https://rstudio.github.io/htmltools/reference/tagList.html" class="external-link">tagList</a></span><span class="op">(</span><span class="fu">bsicons</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/bsicons/man/bs_icon.html" class="external-link">bs_icon</a></span><span class="op">(</span><span class="st">"arrow-counterclockwise"</span><span class="op">)</span>, <span class="st">" Clear All"</span><span class="op">)</span>,</span>
-<span>      class <span class="op">=</span> <span class="st">"btn-secondary btn-sm"</span></span>
-<span>    <span class="op">)</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="co"># ── Module Server ──────────────────────────────────────────────────────────────</span></span>
-<span><span class="va">annotator_super_simple_server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span></span>
-<span>  <span class="va">id</span>,</span>
-<span>  <span class="va">source_data</span>,</span>
-<span>  <span class="va">row_id</span>,</span>
-<span>  <span class="va">display_cols</span>,</span>
-<span>  <span class="va">selection</span> <span class="op">=</span> <span class="st">"multiple"</span>,</span>
-<span>  <span class="va">reactable_options</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/moduleServer.html" class="external-link">moduleServer</a></span><span class="op">(</span><span class="va">id</span>, <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">ns</span> <span class="op">&lt;-</span> <span class="va">session</span><span class="op">$</span><span class="va">ns</span></span>
-<span>    <span class="va">element_id</span> <span class="op">&lt;-</span> <span class="fu">ns</span><span class="op">(</span><span class="st">"table"</span><span class="op">)</span></span>
-<span>    <span class="va">selected_ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/reactiveVal.html" class="external-link">reactiveVal</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/observeEvent.html" class="external-link">observeEvent</a></span><span class="op">(</span><span class="va">input</span><span class="op">$</span><span class="va">reset</span>, <span class="op">{</span></span>
-<span>      <span class="fu">reactable</span><span class="fu">::</span><span class="fu"><a href="https://glin.github.io/reactable/reference/updateReactable.html" class="external-link">updateReactable</a></span><span class="op">(</span><span class="st">"table"</span>, selected <span class="op">=</span> <span class="cn">NA</span>, session <span class="op">=</span> <span class="va">session</span><span class="op">)</span></span>
-<span>    <span class="op">}</span>, ignoreInit <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/observeEvent.html" class="external-link">observeEvent</a></span><span class="op">(</span></span>
-<span>      <span class="fu">reactable</span><span class="fu">::</span><span class="fu"><a href="https://glin.github.io/reactable/reference/getReactableState.html" class="external-link">getReactableState</a></span><span class="op">(</span><span class="st">"table"</span>, <span class="st">"selected"</span>, <span class="va">session</span><span class="op">)</span>,</span>
-<span>      <span class="op">{</span></span>
-<span>        <span class="va">indices</span>   <span class="op">&lt;-</span> <span class="fu">reactable</span><span class="fu">::</span><span class="fu"><a href="https://glin.github.io/reactable/reference/getReactableState.html" class="external-link">getReactableState</a></span><span class="op">(</span><span class="st">"table"</span>, <span class="st">"selected"</span>, <span class="va">session</span><span class="op">)</span></span>
-<span>        <span class="va">data</span>      <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/isolate.html" class="external-link">isolate</a></span><span class="op">(</span><span class="fu">source_data</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span>        <span class="va">visible_ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">data</span><span class="op">[[</span><span class="va">row_id</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
-<span>        <span class="va">current</span>   <span class="op">&lt;-</span> <span class="fu">selected_ids</span><span class="op">(</span><span class="op">)</span></span>
-<span></span>
-<span>        <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">indices</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>          <span class="fu">selected_ids</span><span class="op">(</span><span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="va">current</span>, <span class="va">visible_ids</span><span class="op">)</span><span class="op">)</span></span>
-<span>        <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
-<span>          <span class="va">new_ids</span> <span class="op">&lt;-</span> <span class="va">visible_ids</span><span class="op">[</span><span class="va">indices</span><span class="op">]</span></span>
-<span>          <span class="fu">selected_ids</span><span class="op">(</span><span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">union</a></span><span class="op">(</span><span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="va">current</span>, <span class="va">visible_ids</span><span class="op">)</span>, <span class="va">new_ids</span><span class="op">)</span><span class="op">)</span></span>
-<span>        <span class="op">}</span></span>
-<span>      <span class="op">}</span>,</span>
-<span>      ignoreNULL <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>      ignoreInit <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span>    <span class="op">)</span></span>
-<span></span>
-<span>    <span class="va">output</span><span class="op">$</span><span class="va">table</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://glin.github.io/reactable/reference/reactable-shiny.html" class="external-link">renderReactable</a></span><span class="op">(</span><span class="op">{</span></span>
-<span>      <span class="va">data</span>        <span class="op">&lt;-</span> <span class="fu">source_data</span><span class="op">(</span><span class="op">)</span></span>
-<span>      <span class="va">visible_ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">data</span><span class="op">[[</span><span class="va">row_id</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
-<span>      <span class="va">current_selected</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/isolate.html" class="external-link">isolate</a></span><span class="op">(</span><span class="fu">selected_ids</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span>      <span class="va">default_selected</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="va">visible_ids</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="va">current_selected</span><span class="op">)</span></span>
-<span>      <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">default_selected</span><span class="op">)</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span> <span class="va">default_selected</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
-<span></span>
-<span>      <span class="va">render_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span></span>
-<span>        <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>Select <span class="op">=</span> <span class="cn">NA_character_</span>, stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>,</span>
-<span>        <span class="va">data</span><span class="op">[</span>, <span class="va">display_cols</span>, drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span></span>
-<span>      <span class="op">)</span></span>
-<span></span>
-<span>      <span class="va">col_defs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>        <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>          .selection <span class="op">=</span> <span class="fu"><a href="https://glin.github.io/reactable/reference/colDef.html" class="external-link">colDef</a></span><span class="op">(</span>show <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>,</span>
-<span>          Select <span class="op">=</span> <span class="fu"><a href="https://glin.github.io/reactable/reference/colDef.html" class="external-link">colDef</a></span><span class="op">(</span></span>
-<span>            name  <span class="op">=</span> <span class="st">""</span>,</span>
-<span>            width <span class="op">=</span> <span class="fl">45</span>,</span>
-<span>            html  <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>            cell  <span class="op">=</span> <span class="fu">reactable</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/htmlwidgets/man/JS.html" class="external-link">JS</a></span><span class="op">(</span></span>
-<span>              <span class="st">"function(cellInfo) {</span></span>
-<span><span class="st">                 const checked = cellInfo.selected ? 'checked' : '';</span></span>
-<span><span class="st">                 return '&lt;input type=\"checkbox\" ' + checked +</span></span>
-<span><span class="st">                        ' aria-label=\"Select row\"' +</span></span>
-<span><span class="st">                        ' style=\"width:16px;height:16px;cursor:pointer;' +</span></span>
-<span><span class="st">                        'accent-color:#0d6efd;\"&gt;';</span></span>
-<span><span class="st">               }"</span></span>
-<span>            <span class="op">)</span></span>
-<span>          <span class="op">)</span></span>
-<span>        <span class="op">)</span>,</span>
-<span>        <span class="fu"><a href="https://rdrr.io/r/stats/setNames.html" class="external-link">setNames</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">display_cols</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://glin.github.io/reactable/reference/colDef.html" class="external-link">colDef</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>, <span class="va">display_cols</span><span class="op">)</span></span>
-<span>      <span class="op">)</span></span>
-<span></span>
-<span>      <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span></span>
-<span>        <span class="va">reactable</span>,</span>
-<span>        <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>          <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>            data            <span class="op">=</span> <span class="va">render_data</span>,</span>
-<span>            selection       <span class="op">=</span> <span class="va">selection</span>,</span>
-<span>            onClick         <span class="op">=</span> <span class="st">"select"</span>,</span>
-<span>            rowStyle        <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cursor <span class="op">=</span> <span class="st">"pointer"</span><span class="op">)</span>,</span>
-<span>            columns         <span class="op">=</span> <span class="va">col_defs</span>,</span>
-<span>            defaultSelected <span class="op">=</span> <span class="va">default_selected</span>,</span>
-<span>            elementId       <span class="op">=</span> <span class="va">element_id</span></span>
-<span>          <span class="op">)</span>,</span>
-<span>          <span class="va">reactable_options</span></span>
-<span>        <span class="op">)</span></span>
-<span>      <span class="op">)</span></span>
-<span>    <span class="op">}</span><span class="op">)</span></span>
-<span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/reactive.html" class="external-link">reactive</a></span><span class="op">(</span><span class="op">{</span></span>
-<span>      <span class="va">ids</span>         <span class="op">&lt;-</span> <span class="fu">selected_ids</span><span class="op">(</span><span class="op">)</span></span>
-<span>      <span class="va">data</span>        <span class="op">&lt;-</span> <span class="fu">source_data</span><span class="op">(</span><span class="op">)</span></span>
-<span>      <span class="va">visible_ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">data</span><span class="op">[[</span><span class="va">row_id</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
-<span>      <span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">intersect</a></span><span class="op">(</span><span class="va">ids</span>, <span class="va">visible_ids</span><span class="op">)</span></span>
-<span>    <span class="op">}</span><span class="op">)</span></span>
-<span>  <span class="op">}</span><span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="co"># ── App ────────────────────────────────────────────────────────────────────────</span></span>
-<span><span class="va">mtcars_data</span> <span class="op">&lt;-</span> <span class="va">mtcars</span></span>
-<span><span class="va">mtcars_data</span><span class="op">$</span><span class="va">car</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">mtcars</span><span class="op">)</span></span>
+<span><span class="va">mtcars_data</span>      <span class="op">&lt;-</span> <span class="va">mtcars</span></span>
+<span><span class="va">mtcars_data</span><span class="op">$</span><span class="va">car</span>  <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">mtcars</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">mtcars_data</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
 <span></span>
 <span><span class="va">display_cols</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"car"</span>, <span class="st">"mpg"</span>, <span class="st">"cyl"</span>, <span class="st">"hp"</span>, <span class="st">"wt"</span><span class="op">)</span></span>
@@ -241,136 +121,21 @@
 <span>  <span class="op">}</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/shinyApp.html" class="external-link">shinyApp</a></span><span class="op">(</span><span class="va">ui</span>, <span class="va">server</span><span class="op">)</span></span></code></pre>
-<p>This example illustrates the use of a shiny filter to filter rows.</p>
-<div class="column-screen-inset">
-<pre class="shinylive-r" data-engine="r"><code><span><span class="co">#| '!! shinylive warning !!': |</span></span>
-<span><span class="co">#|   shinylive does not work in self-contained HTML documents.</span></span>
-<span><span class="co">#|   Please set `embed-resources: false` in your metadata.</span></span>
-<span><span class="co">#| standalone: true</span></span>
-<span><span class="co">#| viewerHeight: 600</span></span>
-<span><span class="co">#| components: [editor, viewer]</span></span>
-<span><span class="co">#| column: screen-inset</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://shiny.posit.co/" class="external-link">shiny</a></span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/shinyApp.html" class="external-link">shinyApp</a></span><span class="op">(</span><span class="va">ui</span>, <span class="va">server</span><span class="op">)</span></span></code></pre></div>
+</div>
+</section><section class="level2"><h2 id="filtering-with-selection-persistence">Filtering with selection persistence<a class="anchor" aria-label="anchor" href="#filtering-with-selection-persistence"></a>
+</h2>
+<p>Because <code>source_data</code> is a reactive expression, you can drive it from any filter control. Rows that are selected and then temporarily hidden by a filter remain selected when they reappear — the module reconciles visible row indices against the stored ID vector on every render.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://shiny.posit.co/" class="external-link">shiny</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://glin.github.io/reactable/" class="external-link">reactable</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/matthewcurrier/reactable.shiny" class="external-link">reactableShiny</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">theme_bare</span> <span class="op">&lt;-</span> <span class="fu">reactable</span><span class="fu">::</span><span class="fu"><a href="https://glin.github.io/reactable/reference/reactableTheme.html" class="external-link">reactableTheme</a></span><span class="op">(</span></span>
-<span>  borderColor <span class="op">=</span> <span class="st">"transparent"</span>,</span>
-<span>  headerStyle <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>borderBottom <span class="op">=</span> <span class="st">"none"</span>, fontWeight <span class="op">=</span> <span class="st">"normal"</span><span class="op">)</span>,</span>
-<span>  backgroundColor <span class="op">=</span> <span class="st">"transparent"</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">annotator_super_simple_ui</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">id</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">ns</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/NS.html" class="external-link">NS</a></span><span class="op">(</span><span class="va">id</span><span class="op">)</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>    table <span class="op">=</span> <span class="fu"><a href="https://glin.github.io/reactable/reference/reactable-shiny.html" class="external-link">reactableOutput</a></span><span class="op">(</span><span class="fu">ns</span><span class="op">(</span><span class="st">"table"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>    reset_button <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/actionButton.html" class="external-link">actionButton</a></span><span class="op">(</span></span>
-<span>      <span class="fu">ns</span><span class="op">(</span><span class="st">"reset"</span><span class="op">)</span>,</span>
-<span>      label <span class="op">=</span> <span class="fu"><a href="https://rstudio.github.io/htmltools/reference/tagList.html" class="external-link">tagList</a></span><span class="op">(</span><span class="fu">bsicons</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/bsicons/man/bs_icon.html" class="external-link">bs_icon</a></span><span class="op">(</span><span class="st">"arrow-counterclockwise"</span><span class="op">)</span>, <span class="st">" Clear All"</span><span class="op">)</span>,</span>
-<span>      class <span class="op">=</span> <span class="st">"btn-secondary btn-sm"</span></span>
-<span>    <span class="op">)</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="va">annotator_super_simple_server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span></span>
-<span>  <span class="va">id</span>,</span>
-<span>  <span class="va">source_data</span>,</span>
-<span>  <span class="va">row_id</span>,</span>
-<span>  <span class="va">display_cols</span>,</span>
-<span>  <span class="va">selection</span> <span class="op">=</span> <span class="st">"multiple"</span>,</span>
-<span>  <span class="va">reactable_options</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/moduleServer.html" class="external-link">moduleServer</a></span><span class="op">(</span><span class="va">id</span>, <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">ns</span> <span class="op">&lt;-</span> <span class="va">session</span><span class="op">$</span><span class="va">ns</span></span>
-<span>    <span class="va">selected_ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/reactiveVal.html" class="external-link">reactiveVal</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/observeEvent.html" class="external-link">observeEvent</a></span><span class="op">(</span><span class="va">input</span><span class="op">$</span><span class="va">reset</span>, <span class="op">{</span></span>
-<span>      <span class="fu">selected_ids</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
-<span>      <span class="fu">reactable</span><span class="fu">::</span><span class="fu"><a href="https://glin.github.io/reactable/reference/updateReactable.html" class="external-link">updateReactable</a></span><span class="op">(</span><span class="st">"table"</span>, selected <span class="op">=</span> <span class="cn">NA</span>, session <span class="op">=</span> <span class="va">session</span><span class="op">)</span></span>
-<span>    <span class="op">}</span>, ignoreInit <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/observeEvent.html" class="external-link">observeEvent</a></span><span class="op">(</span></span>
-<span>      <span class="fu">reactable</span><span class="fu">::</span><span class="fu"><a href="https://glin.github.io/reactable/reference/getReactableState.html" class="external-link">getReactableState</a></span><span class="op">(</span><span class="st">"table"</span>, <span class="st">"selected"</span>, <span class="va">session</span><span class="op">)</span>,</span>
-<span>      <span class="op">{</span></span>
-<span>        <span class="va">indices</span>     <span class="op">&lt;-</span> <span class="fu">reactable</span><span class="fu">::</span><span class="fu"><a href="https://glin.github.io/reactable/reference/getReactableState.html" class="external-link">getReactableState</a></span><span class="op">(</span><span class="st">"table"</span>, <span class="st">"selected"</span>, <span class="va">session</span><span class="op">)</span></span>
-<span>        <span class="va">data</span>        <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/isolate.html" class="external-link">isolate</a></span><span class="op">(</span><span class="fu">source_data</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span>        <span class="va">visible_ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">data</span><span class="op">[[</span><span class="va">row_id</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
-<span>        <span class="va">current</span>     <span class="op">&lt;-</span> <span class="fu">selected_ids</span><span class="op">(</span><span class="op">)</span></span>
-<span></span>
-<span>        <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">indices</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>          <span class="fu">selected_ids</span><span class="op">(</span><span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="va">current</span>, <span class="va">visible_ids</span><span class="op">)</span><span class="op">)</span></span>
-<span>        <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
-<span>          <span class="va">new_ids</span> <span class="op">&lt;-</span> <span class="va">visible_ids</span><span class="op">[</span><span class="va">indices</span><span class="op">]</span></span>
-<span>          <span class="fu">selected_ids</span><span class="op">(</span><span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">union</a></span><span class="op">(</span><span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="va">current</span>, <span class="va">visible_ids</span><span class="op">)</span>, <span class="va">new_ids</span><span class="op">)</span><span class="op">)</span></span>
-<span>        <span class="op">}</span></span>
-<span>      <span class="op">}</span>,</span>
-<span>      ignoreNULL <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>      ignoreInit <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span>    <span class="op">)</span></span>
-<span></span>
-<span>    <span class="va">output</span><span class="op">$</span><span class="va">table</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://glin.github.io/reactable/reference/reactable-shiny.html" class="external-link">renderReactable</a></span><span class="op">(</span><span class="op">{</span></span>
-<span>      <span class="va">data</span>             <span class="op">&lt;-</span> <span class="fu">source_data</span><span class="op">(</span><span class="op">)</span></span>
-<span>      <span class="va">visible_ids</span>      <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">data</span><span class="op">[[</span><span class="va">row_id</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
-<span>      <span class="va">current_selected</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/isolate.html" class="external-link">isolate</a></span><span class="op">(</span><span class="fu">selected_ids</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span>      <span class="va">default_selected</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="va">visible_ids</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="va">current_selected</span><span class="op">)</span></span>
-<span>      <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">default_selected</span><span class="op">)</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span> <span class="va">default_selected</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
-<span></span>
-<span>      <span class="va">render_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span></span>
-<span>        <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>Select <span class="op">=</span> <span class="cn">NA_character_</span>, stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>,</span>
-<span>        <span class="va">data</span><span class="op">[</span>, <span class="va">display_cols</span>, drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span></span>
-<span>      <span class="op">)</span></span>
-<span></span>
-<span>      <span class="va">col_defs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>        <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>          .selection <span class="op">=</span> <span class="fu"><a href="https://glin.github.io/reactable/reference/colDef.html" class="external-link">colDef</a></span><span class="op">(</span>show <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>,</span>
-<span>          Select <span class="op">=</span> <span class="fu"><a href="https://glin.github.io/reactable/reference/colDef.html" class="external-link">colDef</a></span><span class="op">(</span></span>
-<span>            name  <span class="op">=</span> <span class="st">""</span>,</span>
-<span>            width <span class="op">=</span> <span class="fl">45</span>,</span>
-<span>            html  <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>            cell  <span class="op">=</span> <span class="fu">reactable</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/htmlwidgets/man/JS.html" class="external-link">JS</a></span><span class="op">(</span></span>
-<span>              <span class="st">"function(cellInfo) {</span></span>
-<span><span class="st">                 const checked = cellInfo.selected ? 'checked' : '';</span></span>
-<span><span class="st">                 return '&lt;input type=\"checkbox\" ' + checked +</span></span>
-<span><span class="st">                        ' aria-label=\"Select row\"' +</span></span>
-<span><span class="st">                        ' style=\"width:16px;height:16px;cursor:pointer;' +</span></span>
-<span><span class="st">                        'accent-color:#0d6efd;\"&gt;';</span></span>
-<span><span class="st">               }"</span></span>
-<span>            <span class="op">)</span></span>
-<span>          <span class="op">)</span></span>
-<span>        <span class="op">)</span>,</span>
-<span>        <span class="fu"><a href="https://rdrr.io/r/stats/setNames.html" class="external-link">setNames</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">display_cols</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://glin.github.io/reactable/reference/colDef.html" class="external-link">colDef</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span>, <span class="va">display_cols</span><span class="op">)</span></span>
-<span>      <span class="op">)</span></span>
-<span></span>
-<span>      <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span></span>
-<span>        <span class="va">reactable</span>,</span>
-<span>        <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>          <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>            data            <span class="op">=</span> <span class="va">render_data</span>,</span>
-<span>            selection       <span class="op">=</span> <span class="va">selection</span>,</span>
-<span>            onClick         <span class="op">=</span> <span class="st">"select"</span>,</span>
-<span>            rowStyle        <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cursor <span class="op">=</span> <span class="st">"pointer"</span><span class="op">)</span>,</span>
-<span>            columns         <span class="op">=</span> <span class="va">col_defs</span>,</span>
-<span>            defaultSelected <span class="op">=</span> <span class="va">default_selected</span>,</span>
-<span>            theme           <span class="op">=</span> <span class="va">theme_bare</span></span>
-<span>          <span class="op">)</span>,</span>
-<span>          <span class="va">reactable_options</span></span>
-<span>        <span class="op">)</span></span>
-<span>      <span class="op">)</span></span>
-<span>    <span class="op">}</span><span class="op">)</span></span>
-<span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/reactive.html" class="external-link">reactive</a></span><span class="op">(</span><span class="op">{</span></span>
-<span>      <span class="va">ids</span>         <span class="op">&lt;-</span> <span class="fu">selected_ids</span><span class="op">(</span><span class="op">)</span></span>
-<span>      <span class="va">data</span>        <span class="op">&lt;-</span> <span class="fu">source_data</span><span class="op">(</span><span class="op">)</span></span>
-<span>      <span class="va">visible_ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">data</span><span class="op">[[</span><span class="va">row_id</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
-<span>      <span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">intersect</a></span><span class="op">(</span><span class="va">ids</span>, <span class="va">visible_ids</span><span class="op">)</span></span>
-<span>    <span class="op">}</span><span class="op">)</span></span>
-<span>  <span class="op">}</span><span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="co"># ── App ─────────────────────────────────────────────────────────────────</span></span>
 <span><span class="va">mtcars_data</span>      <span class="op">&lt;-</span> <span class="va">mtcars</span></span>
 <span><span class="va">mtcars_data</span><span class="op">$</span><span class="va">car</span>  <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">mtcars</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">mtcars_data</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
+<span></span>
 <span><span class="va">display_cols</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"car"</span>, <span class="st">"mpg"</span>, <span class="st">"cyl"</span>, <span class="st">"hp"</span>, <span class="st">"wt"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">ui_els</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/annotator_super_simple_ui.html">annotator_super_simple_ui</a></span><span class="op">(</span><span class="st">"demo"</span><span class="op">)</span></span>
@@ -420,7 +185,7 @@
 <span>  <span class="op">}</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/shinyApp.html" class="external-link">shinyApp</a></span><span class="op">(</span><span class="va">ui</span>, <span class="va">server</span><span class="op">)</span></span></code></pre>
+<span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/shinyApp.html" class="external-link">shinyApp</a></span><span class="op">(</span><span class="va">ui</span>, <span class="va">server</span><span class="op">)</span></span></code></pre></div>
 </div>
 </section><script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
@@ -505,7 +270,8 @@
       }
     }
   });
-  </script></main>
+  </script></main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside>
 </div>
 
 

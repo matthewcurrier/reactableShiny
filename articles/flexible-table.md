@@ -1,18 +1,22 @@
-# Overview
+# Using the flexible_table module
 
-# Overview
+## Overview
 
-The `flexible_table_ui()` and `flexible_table_server()` r shiny module
-leverage the [reactable package](https://glin.github.io/reactable/) to
-facilitate dynamic data entry. Reactable acts as a scaffold for user
-input. The user establishes choices for a select dropdown which are
-passed into a reactable table for selection. The user can **add rows**,
-**delete rows**, and **reset the table**. The module **returns a
-reactive data frame** of the current selections.
+The
+[`flexible_table_ui()`](https://matthewcurrier.github.io/reactableShiny/reference/flexible_table_ui.md)
+and
+[`flexible_table_server()`](https://matthewcurrier.github.io/reactableShiny/reference/flexible_table_server.md)
+r shiny module leverage the [reactable
+package](https://glin.github.io/reactable/) to facilitate dynamic data
+entry. Reactable acts as a scaffold for user input. The user establishes
+choices for a select dropdown which are passed into a reactable table
+for selection. The user can **add rows**, **delete rows**, and **reset
+the table**. The module **returns a reactive data frame** of the current
+selections.
 
-## Simple Example: People Who Live in Your Home
+### Simple Example: People Who Live in Your Home
 
-Letâ€™s say you have a survey where you want to know who lives in the
+Let’s say you have a survey where you want to know who lives in the
 household with a user. Your list of possible people includes the below:
 
 ``` r
@@ -44,10 +48,10 @@ professions <- c(
 )
 ```
 
-### Step 1: Detail the Dropdown Specifications
+#### Step 1: Detail the Dropdown Specifications
 
-Every dropdown in the table is described by a **column spec** â€” a
-named list with at minimum a `name`, `label`, and `choices`:
+Every dropdown in the table is described by a **column spec** — a named
+list with at minimum a `name`, `label`, and `choices`:
 
 ``` r
 col_specs <- list(
@@ -73,9 +77,10 @@ col_specs <- list(
 For this example, we will be collecting information on `home_occupant`
 and `profession`.
 
-### Step 2: Create Shiny App
+#### Step 2: Create Shiny App
 
 ``` r
+
 library(shiny)
 library(bslib)
 library(purrr)
@@ -137,11 +142,11 @@ server <- function(input, output, session) {
 shinyApp(ui, server)
 ```
 
-### Wiring up the UI
+#### Wiring up the UI
 
-`flexible_table_ui()` returns a **named list** rather than a single UI
-element. This lets you place the table and its buttons independently in
-your layout:
+[`flexible_table_ui()`](https://matthewcurrier.github.io/reactableShiny/reference/flexible_table_ui.md)
+returns a **named list** rather than a single UI element. This lets you
+place the table and its buttons independently in your layout:
 
 ``` r
 ui <- bslib::page_fluid(
@@ -166,13 +171,14 @@ ui <- bslib::page_fluid(
 )
 ```
 
-### Wiring up the server
+#### Wiring up the server
 
-`flexible_table_server()` returns a **reactive data frame** of the
-current table contents. The default behavior is to exclude rows where
-every cell in blank. This feature can be controlled through a parameter
-called `duplicates_allowed`. The default value for `duplicates_allowed`
-is `FALSE`.
+[`flexible_table_server()`](https://matthewcurrier.github.io/reactableShiny/reference/flexible_table_server.md)
+returns a **reactive data frame** of the current table contents. The
+default behavior is to exclude rows where every cell in blank. This
+feature can be controlled through a parameter called
+`duplicates_allowed`. The default value for `duplicates_allowed` is
+`FALSE`.
 
 ``` r
 server <- function(input, output, session) {
@@ -183,7 +189,7 @@ server <- function(input, output, session) {
     col_specs = col_specs
   )
 
-  # selected() is a reactive data frame â use it like any other reactive
+  # selected() is a reactive data frame — use it like any other reactive
   observe({
     print(selected())
   })
@@ -191,11 +197,11 @@ server <- function(input, output, session) {
 }
 ```
 
-### Example with Duplicates Allowed
+#### Example with Duplicates Allowed
 
-In the above example, you can see that a user can add as many
-â€˜siblingsâ€™ or â€˜mothersâ€™ or â€˜fathersâ€™ as they like. If,
-however, you want to disallow duplicates, you can do that as well.
+In the above example, you can see that a user can add as many ‘siblings’
+or ‘mothers’ or ‘fathers’ as they like. If, however, you want to
+disallow duplicates, you can do that as well.
 
 ``` r
 library(shiny)
@@ -231,17 +237,17 @@ shinyApp(ui, server)
 
 ------------------------------------------------------------------------
 
-## Pre-populating with `initial_data`
+### Pre-populating with `initial_data`
 
 Pass a reactive data frame to `initial_data` to pre-fill the table. This
-is useful when editing an existing record â€” you load the saved values
+is useful when editing an existing record — you load the saved values
 into the table, the user makes changes, and you read the updated values
 back out.
 
 ``` r
 server <- function(input, output, session) {
 
-  # A reactive that returns the data to load â could come from a database,
+  # A reactive that returns the data to load — could come from a database,
   # a file, or another reactive in your app
 
 
@@ -313,11 +319,11 @@ shinyApp(ui, server)
 Column names in `initial_data` must match the `name` fields in
 `col_specs`.
 
-`initial_data` is **reactive** â€” if the reactive expression fires
-again (for example, because the user switches to a different record),
-the table is replaced with the new data automatically.
+`initial_data` is **reactive** — if the reactive expression fires again
+(for example, because the user switches to a different record), the
+table is replaced with the new data automatically.
 
-### Resetting to a blank table
+#### Resetting to a blank table
 
 Passing a data frame with zero rows triggers a reset to a single blank
 row. This is useful when switching from edit mode to add mode:
@@ -325,7 +331,7 @@ row. This is useful when switching from edit mode to add mode:
 ``` r
 existing_data <- reactive({
   if (input$mode == "add") {
-    data.frame()          # zero rows â signals a reset
+    data.frame()          # zero rows — signals a reset
   } else {
     load_record(input$record_id)
   }
@@ -334,9 +340,9 @@ existing_data <- reactive({
 
 ------------------------------------------------------------------------
 
-## Options
+### Options
 
-### `duplicates_allowed`
+#### `duplicates_allowed`
 
 Set `duplicates_allowed = FALSE` to silently remove duplicate rows from
 the returned data frame. Two rows are considered duplicates if every
@@ -350,14 +356,14 @@ selected <- flexible_table_server(
 )
 ```
 
-Note that duplicates are only removed from the *returned* reactive â€”
-the user can still see and interact with them in the table itself.
+Note that duplicates are only removed from the *returned* reactive — the
+user can still see and interact with them in the table itself.
 
-### `complete_rows_only`
+#### `complete_rows_only`
 
 By default the module returns rows where **at least one** value has been
-chosen. Completely empty rows â€” such as the initial blank row before
-the user touches anything â€” are excluded.
+chosen. Completely empty rows — such as the initial blank row before the
+user touches anything — are excluded.
 
 If your downstream code requires every column to be filled in, set
 `complete_rows_only = TRUE`:
@@ -378,7 +384,7 @@ returned:
 | `FALSE` (default)    | Any row with at least one non-blank value |
 | `TRUE`               | Only rows where every column is filled in |
 
-### Combining both options
+#### Combining both options
 
 The two options compose independently:
 
@@ -396,9 +402,9 @@ removed.
 
 ------------------------------------------------------------------------
 
-## Applying a custom theme
+### Applying a custom theme
 
-The table uses `theme_bare` by default â€” a minimal transparent theme
+The table uses `theme_bare` by default — a minimal transparent theme
 that inherits styling from the surrounding page. To apply a different
 [`reactable::reactableTheme()`](https://glin.github.io/reactable/reference/reactableTheme.html),
 pass it to `reactable_theme`:
