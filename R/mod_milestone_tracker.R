@@ -245,7 +245,7 @@ milestone_tracker_server <- function(
         highlight = TRUE,
         bordered = TRUE,
         defaultPageSize = 20,
-        theme = reactableTheme(
+        theme = reactable::reactableTheme(
           headerStyle = list(fontWeight = 500),
           rowSelectedStyle = list(
             backgroundColor = "#EAF3DE",

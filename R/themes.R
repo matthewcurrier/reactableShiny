@@ -6,7 +6,7 @@
 #' @importFrom reactable reactableTheme
 #'
 #' @noRd
-theme_bare <- reactableTheme(
+theme_bare <- reactable::reactableTheme(
   borderColor = "transparent",
   headerStyle = list(borderBottom = "none", fontWeight = "normal"),
   backgroundColor = "transparent"
