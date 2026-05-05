@@ -40,6 +40,7 @@ The server function returns a reactive that you can observe or pass
 downstream.
 
 ``` r
+
 library(shiny)
 library(bslib)
 library(reactableShiny)
@@ -107,6 +108,7 @@ same row are interactive. This is useful when a “flag this row” checkbox
 should unlock additional detail fields.
 
 ``` r
+
 col_specs <- list(
   list(name = "car",    type = "display",  label = "Car"),
   list(name = "flag",   type = "checkbox", label = "Flag for review?"),
@@ -133,6 +135,7 @@ note — the annotation panel updates in real time to show only rows you
 have touched.
 
 ``` r
+
 library(shiny)
 library(bslib)
 library(reactableShiny)

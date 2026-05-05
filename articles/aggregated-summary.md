@@ -23,6 +23,7 @@ returns a **named list** (`table`, `add_row_button`, `reset_button`) so
 each element can be placed anywhere in your layout independently.
 
 ``` r
+
 library(shiny)
 library(bslib)
 library(reactableShiny)
@@ -87,16 +88,16 @@ shinyApp(ui, server)
 
 **Column spec quick reference**
 
-| Field                  | Required?   | Purpose                                              |
-|------------------------|-------------|------------------------------------------------------|
-| `name`                 | Yes         | Data frame column name & Shiny input ID prefix       |
-| `label`                | Yes         | Header text                                          |
-| `type`                 | No\*        | `"select"` (default), `"text"`, `"date"`             |
-| `choices`              | select      | Named character vector or grouped named list         |
-| `default`              | No          | Pre-filled value for new rows (`""` if omitted)      |
-| `width`                | No          | Column width in pixels                               |
-| `depends_on`           | No          | Name of a parent column whose value filters this one |
-| `get_filtered_choices` | conditional | `function(parent_value)` returning a choices vector  |
+| Field | Required? | Purpose |
+|----|----|----|
+| `name` | Yes | Data frame column name & Shiny input ID prefix |
+| `label` | Yes | Header text |
+| `type` | No\* | `"select"` (default), `"text"`, `"date"` |
+| `choices` | select | Named character vector or grouped named list |
+| `default` | No | Pre-filled value for new rows (`""` if omitted) |
+| `width` | No | Column width in pixels |
+| `depends_on` | No | Name of a parent column whose value filters this one |
+| `get_filtered_choices` | conditional | `function(parent_value)` returning a choices vector |
 
 \*Omitting `type` defaults to `"select"` for backward compatibility.
 
@@ -117,6 +118,7 @@ output is a character vector of selected row IDs.
 returns a named list (`table`, `reset_button`).
 
 ``` r
+
 library(shiny)
 library(bslib)
 library(reactableShiny)
@@ -187,6 +189,7 @@ greyed out and non-interactive until the `approved` checkbox in the same
 row is checked.
 
 ``` r
+
 library(shiny)
 library(bslib)
 library(reactableShiny)
@@ -243,16 +246,16 @@ shinyApp(ui, server)
 
 **Column type reference**
 
-| `type`                | Widget                                 | Extra required fields |
-|-----------------------|----------------------------------------|-----------------------|
-| `"display"`           | Read-only text                         | —                     |
-| `"clickable_display"` | Clickable cell that toggles a checkbox | `toggles`             |
-| `"select"`            | Dropdown                               | `choices`             |
-| `"checkbox"`          | Checkbox                               | —                     |
-| `"text_checkbox"`     | Clickable label + checkbox             | `display_col`         |
-| `"text"`              | Free-text input                        | —                     |
-| `"number"`            | Numeric input                          | —                     |
-| `"radio"`             | Radio button group                     | `choices`             |
+| `type` | Widget | Extra required fields |
+|----|----|----|
+| `"display"` | Read-only text | — |
+| `"clickable_display"` | Clickable cell that toggles a checkbox | `toggles` |
+| `"select"` | Dropdown | `choices` |
+| `"checkbox"` | Checkbox | — |
+| `"text_checkbox"` | Clickable label + checkbox | `display_col` |
+| `"text"` | Free-text input | — |
+| `"number"` | Numeric input | — |
+| `"radio"` | Radio button group | `choices` |
 
 All types accept `label`, `width`, `col_def_options`, and `gates` (the
 name of a checkbox column that controls this input’s interactivity).
@@ -276,6 +279,7 @@ returns a complete two-column `bslib` layout — no individual element
 placement needed.
 
 ``` r
+
 library(shiny)
 library(bslib)
 library(reactableShiny)
@@ -361,12 +365,12 @@ shinyApp(ui, server)
 
 ## Quick reference
 
-| Module                   | Source data | Returns                                                       |
-|--------------------------|-------------|---------------------------------------------------------------|
-| `flexible_table`         | User-built  | `data.frame` of complete, non-blank rows                      |
-| `annotator_super_simple` | Provided    | `character` vector of selected row IDs                        |
-| `annotator_table`        | Provided    | `data.frame` of touched annotation rows                       |
-| `milestone_tracker`      | Provided    | `data.frame` of touched annotation rows (selected items only) |
+| Module | Source data | Returns |
+|----|----|----|
+| `flexible_table` | User-built | `data.frame` of complete, non-blank rows |
+| `annotator_super_simple` | Provided | `character` vector of selected row IDs |
+| `annotator_table` | Provided | `data.frame` of touched annotation rows |
+| `milestone_tracker` | Provided | `data.frame` of touched annotation rows (selected items only) |
 
 All server functions accept `reactable_theme` (a `reactableTheme`
 object) and `reactable_options` (a named list of extra

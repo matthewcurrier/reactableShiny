@@ -20,6 +20,7 @@ Let’s say you have a survey where you want to know who lives in the
 household with a user. Your list of possible people includes the below:
 
 ``` r
+
 home_occupants <- c(
   "mother",
   "father",
@@ -38,6 +39,7 @@ You are also curious to know what the people in this household do for a
 living.
 
 ``` r
+
 professions <- c(
   "doctor",
   "lawyer",
@@ -54,6 +56,7 @@ Every dropdown in the table is described by a **column spec** — a named
 list with at minimum a `name`, `label`, and `choices`:
 
 ``` r
+
 col_specs <- list(
   list(
     name    = "home_occupants",
@@ -80,6 +83,7 @@ and `profession`.
 #### Step 2: Create Shiny App
 
 ``` r
+
 
 library(shiny)
 library(bslib)
@@ -149,6 +153,7 @@ returns a **named list** rather than a single UI element. This lets you
 place the table and its buttons independently in your layout:
 
 ``` r
+
 ui <- bslib::page_fluid(
   bslib::layout_columns(
     col_widths = c(2, 10),
@@ -166,6 +171,7 @@ If you want all three elements together in one place,
 `do.call(tagList, ...)` works as a shortcut:
 
 ``` r
+
 ui <- bslib::page_fluid(
   do.call(tagList, flexible_table_ui("my_table"))
 )
@@ -181,6 +187,7 @@ feature can be controlled through a parameter called
 `FALSE`.
 
 ``` r
+
 server <- function(input, output, session) {
 
   selected <- flexible_table_server(
@@ -204,6 +211,7 @@ or ‘mothers’ or ‘fathers’ as they like. If, however, you want to
 disallow duplicates, you can do that as well.
 
 ``` r
+
 library(shiny)
 library(bslib)
 library(reactableShiny)
@@ -245,6 +253,7 @@ into the table, the user makes changes, and you read the updated values
 back out.
 
 ``` r
+
 server <- function(input, output, session) {
 
   # A reactive that returns the data to load — could come from a database,
@@ -261,6 +270,7 @@ server <- function(input, output, session) {
 ```
 
 ``` r
+
 library(shiny)
 library(bslib)
 library(reactableShiny)
@@ -329,6 +339,7 @@ Passing a data frame with zero rows triggers a reset to a single blank
 row. This is useful when switching from edit mode to add mode:
 
 ``` r
+
 existing_data <- reactive({
   if (input$mode == "add") {
     data.frame()          # zero rows — signals a reset
@@ -349,6 +360,7 @@ the returned data frame. Two rows are considered duplicates if every
 column value is identical:
 
 ``` r
+
 selected <- flexible_table_server(
   id                 = "my_table",
   col_specs          = col_specs,
@@ -369,6 +381,7 @@ If your downstream code requires every column to be filled in, set
 `complete_rows_only = TRUE`:
 
 ``` r
+
 selected <- flexible_table_server(
   id                 = "my_table",
   col_specs          = col_specs,
@@ -389,6 +402,7 @@ returned:
 The two options compose independently:
 
 ``` r
+
 selected <- flexible_table_server(
   id                 = "my_table",
   col_specs          = col_specs,
@@ -410,6 +424,7 @@ that inherits styling from the surrounding page. To apply a different
 pass it to `reactable_theme`:
 
 ``` r
+
 my_theme <- reactable::reactableTheme(
   backgroundColor = "#f8f9fa",
   borderColor     = "#dee2e6"

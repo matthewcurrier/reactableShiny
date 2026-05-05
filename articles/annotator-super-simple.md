@@ -18,6 +18,7 @@ The basic pattern is straightforward — pass a reactive data frame, name
 the row-ID column, and list the columns to display:
 
 ``` r
+
 library(shiny)
 library(reactable)
 library(reactableShiny)
@@ -68,6 +69,7 @@ by a filter remain selected when they reappear — the module reconciles
 visible row indices against the stored ID vector on every render.
 
 ``` r
+
 library(shiny)
 library(reactable)
 library(reactableShiny)

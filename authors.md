@@ -10,13 +10,13 @@ Source:
 [`DESCRIPTION`](https://github.com/matthewcurrier/reactableShiny/blob/main/DESCRIPTION)
 
 Currier M (2026). *reactableShiny: Extends reactable tables for use with
-shiny (ie uploading data)*. R package version 0.1.14,
+shiny (ie uploading data)*. R package version 0.1.14.9000,
 <https://github.com/matthewcurrier/reactable.shiny>.
 
     @Manual{,
       title = {reactableShiny: Extends reactable tables for use with shiny (ie uploading data)},
       author = {Matthew Currier},
       year = {2026},
-      note = {R package version 0.1.14},
+      note = {R package version 0.1.14.9000},
       url = {https://github.com/matthewcurrier/reactable.shiny},
     }

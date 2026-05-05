@@ -136,6 +136,7 @@ annotator_enriched_server(
   starts as \`NULL\` and is only set when a genuine context switch
   occurs:
 
+
         reset_signal <- shiny::reactiveVal(NULL)
         shiny::observeEvent(data_r(), {
           reset_signal(list(

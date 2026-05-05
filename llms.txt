@@ -13,6 +13,7 @@ You can install the development version of reactableShiny from
 [GitHub](https://github.com/) with:
 
 ``` r
+
 # install.packages("pak")
 pak::pak("matthewcurrier/reactableShiny")
 ```
