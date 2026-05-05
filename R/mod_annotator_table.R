@@ -264,6 +264,12 @@ annotator_table_server <- function(
       )
     })
 
+    # bslib::navset_pill tab panes can prevent Shiny from detecting
+    # visibility changes on nested htmlwidget outputs. Force the render
+    # to fire regardless of container visibility so the table appears
+    # the moment its data is ready.
+    outputOptions(output, "table", suspendWhenHidden = FALSE)
+
     # -------------------------------------------------------------------------
     # Return value
     #
