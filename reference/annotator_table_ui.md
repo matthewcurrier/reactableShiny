@@ -1,9 +1,10 @@
 # Annotator table — UI
 
-Returns the UI element for the annotator table module — a single
-\[reactable::reactableOutput()\] placeholder. Unlike
-\[flexible_table_ui()\], there are no add/reset buttons because rows are
-fixed to the source data frame.
+Returns the UI elements for the annotator table module: a
+\[reactable::reactableOutput()\] placeholder plus a JavaScript snippet
+that initialises selectize.js on any \`"selectize"\` columns after the
+table mounts. The script is idempotent — including multiple annotator
+tables on the same page does not duplicate event handlers.
 
 ## Usage
 
@@ -20,7 +21,8 @@ annotator_table_ui(id)
 
 ## Value
 
-A \[reactable::reactableOutput()\] UI element.
+A \[shiny::tagList()\] containing the reactable output and the selectize
+initialiser script.
 
 ## See also
 
