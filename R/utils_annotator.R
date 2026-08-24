@@ -41,6 +41,7 @@ default_annotation_value <- function(spec) {
     checkbox = FALSE,
     text_checkbox = FALSE,
     number = NA_real_,
+    selectize = NA_character_,
     stop(sprintf("Unknown input column type: '%s'", spec$type))
   )
 }
@@ -166,6 +167,7 @@ is_touched <- function(value, type) {
     checkbox = isTRUE(value),
     text_checkbox = isTRUE(value),
     number = !is.null(value) && !is.na(value) && value != 0,
+    selectize = !is.null(value) && !is.na(value) && nzchar(value),
     stop(sprintf("Unknown input column type: '%s'", type))
   )
 }
@@ -468,11 +470,11 @@ make_clickable_display_col_def <- function(spec, annotations, row_id, ns) {
 #'
 #' @noRd
 make_text_checkbox_col_def <- function(
-  spec,
-  annotations,
-  source_data,
-  row_id,
-  ns
+    spec,
+    annotations,
+    source_data,
+    row_id,
+    ns
 ) {
   do.call(
     colDef,
@@ -835,6 +837,158 @@ make_radio_col_def <- function(spec, annotations, row_id, ns) {
 }
 
 
+#' Build a reactable colDef for a selectize dropdown with free-create
+#'
+#' Renders a `<select>` element with the CSS class `ann-selectize-create`.
+#' After the reactable table mounts, a JavaScript initialiser (included by
+#' [annotator_table_ui()]) calls `$(el).selectize({create: true, ...})` on
+#' every element with that class, giving the user a searchable dropdown
+#' that also accepts user-created values.
+#'
+#' **Static mode** (no `server_search`): choices are baked into the HTML as
+#' `<option>` elements and filtered client-side.
+#'
+#' **Server-search mode** (`server_search` is a function): the dropdown
+#' starts empty; as the user types, the JS `load` callback round-trips
+#' through Shiny to call `server_search(query)`, which should return a
+#' data frame with `value` and `label` columns (or a named character
+#' vector). Results populate the dropdown on the fly. The annotation
+#' stores the `value`.
+#'
+#' Created values are row-local — they are not propagated to other rows.
+#'
+#' Because selectize replaces the original `<select>` element in the DOM,
+#' gating attributes are placed on a wrapping `<div>` rather than on the
+#' `<select>` itself (same pattern as [make_radio_col_def()]).
+#'
+#' Unlike `"select"` specs, `"selectize"` specs should **not** include a
+#' blank placeholder entry (e.g. `c("Select..." = "")`) in `choices`.
+#' Instead, provide a `placeholder` field in the spec (defaults to
+#' `"Select or type..."`). The JS initialiser passes this to selectize's
+#' native placeholder mechanism.
+#'
+#' If the current annotation value does not appear in the static
+#' `spec$choices` (or when using server search), it is injected as an
+#' extra `<option>` so that selectize can display it correctly on
+#' re-render.
+#'
+#' @param spec `list`. A single col_spec with `type = "selectize"`.
+#'   Required fields:
+#'   \describe{
+#'     \item{`choices`}{Named character vector of static options (may be
+#'       empty when using `server_search`).}
+#'   }
+#'   Optional fields:
+#'   \describe{
+#'     \item{`placeholder`}{`character(1)`. Placeholder text shown in the
+#'       empty input. Defaults to `"Select or type..."`.}
+#'     \item{`server_search`}{`function(query)`. When present, enables
+#'       server-side search. Must accept a single character query and return
+#'       a data frame with `value` and `label` columns (or a named character
+#'       vector where names are labels and values are values).}
+#'     \item{`min_chars`}{`numeric(1)`. Minimum characters before a server
+#'       search fires. Defaults to `2`. Ignored in static mode.}
+#'     \item{`gates`}{`character(1)`. Name of a checkbox column that
+#'       controls this input's interactivity.}
+#'     \item{`col_def_options`}{`list`. Additional [reactable::colDef()]
+#'       arguments. `cell` may not be included.}
+#'   }
+#' @param annotations `reactive`. The annotations reactiveVal from the parent
+#'   module server.
+#' @param row_id `character(1)`. Name of the ID column.
+#' @param ns `function`. The module namespace function.
+#'
+#' @return A [reactable::colDef()] object.
+#'
+#' @importFrom reactable colDef
+#' @importFrom shiny tags
+#' @importFrom htmltools tagAppendChild tagAppendChildren tagAppendAttributes
+#'
+#' @noRd
+make_selectize_col_def <- function(spec, annotations, row_id, ns) {
+  force(ns)
+  is_server <- !is.null(spec$server_search)
+
+  do.call(
+    colDef,
+    c(
+      list(
+        name = spec$label %||% spec$name,
+        width = spec$width,
+        html = TRUE,
+        cell = function(value, index) {
+          ann <- annotations()
+          id_value <- ann[[row_id]][index]
+          input_id <- ns(paste0(spec$name, "_", id_value))
+          current <- ann[[spec$name]][index]
+          open <- gate_is_open(spec, ann, index)
+          gb_id <- gated_by_id(spec, ns, id_value)
+
+          is_blank <- is.na(current) || !nzchar(current)
+          current_for_options <- if (is.na(current)) "" else current
+          placeholder <- spec$placeholder %||% "Select or type..."
+
+          # Build the <select> with a marker class for JS initialisation
+          select_tag <- tags$select(
+            id = input_id,
+            class = "ann-selectize-create",
+            `data-placeholder` = placeholder
+          )
+
+          if (is_server) {
+            # Server-search mode: dropdown starts empty; options arrive
+            # asynchronously via the load callback. Add data attributes
+            # so the JS initialiser configures the async load callback.
+            select_tag <- tagAppendAttributes(
+              select_tag,
+              `data-server-search`  = "true",
+              `data-search-input-id` = ns("selectize_search"),
+              `data-column-name`    = spec$name,
+              `data-min-chars`      = as.character(spec$min_chars %||% 2L)
+            )
+          } else {
+            # Static mode: bake choices into the HTML as <option> elements
+            select_tag <- tagAppendChildren(
+              select_tag,
+              list = make_options(spec$choices, current_for_options)
+            )
+          }
+
+          # Inject the current value as an <option> so selectize can
+          # display it on re-render. In static mode this is only needed
+          # for user-created values; in server mode it is always needed
+          # because the dropdown starts empty.
+          needs_injected_option <- !is_blank && (
+            is_server || !(current %in% spec$choices)
+          )
+          if (needs_injected_option) {
+            select_tag <- tagAppendChild(
+              select_tag,
+              tags$option(
+                value = current,
+                selected = "selected",
+                current
+              )
+            )
+          }
+
+          # Wrap in a div for gating — selectize replaces the <select> in
+          # the DOM, so gating attributes must live on a parent element.
+          as.character(
+            tags$div(
+              style = gated_style(open),
+              `data-gated-by` = gb_id,
+              select_tag
+            )
+          )
+        }
+      ),
+      spec$col_def_options %||% list()
+    )
+  )
+}
+
+
 #' Dispatch a col_spec to its appropriate colDef builder
 #'
 #' Routes each column specification to the correct `make_*_col_def()`
@@ -853,6 +1007,8 @@ make_radio_col_def <- function(spec, annotations, row_id, ns) {
 #'   \item{`radio`}{Radio button group.}
 #'   \item{`text_checkbox`}{Combined clickable-text + checkbox, sourced from
 #'     a display column named in `display_col`.}
+#'   \item{`selectize`}{Searchable dropdown with free-create via selectize.js.
+#'     Requires `choices`; optionally accepts `placeholder`.}
 #' }
 #'
 #' @param spec `list`. A single column specification.
@@ -870,11 +1026,11 @@ make_radio_col_def <- function(spec, annotations, row_id, ns) {
 #'
 #' @noRd
 make_input_col_def <- function(
-  spec,
-  annotations,
-  row_id,
-  ns,
-  source_data = NULL
+    spec,
+    annotations,
+    row_id,
+    ns,
+    source_data = NULL
 ) {
   force(ns)
   switch(
@@ -891,6 +1047,7 @@ make_input_col_def <- function(
     text = make_text_col_def(spec, annotations, row_id, ns),
     number = make_number_col_def(spec, annotations, row_id, ns),
     radio = make_radio_col_def(spec, annotations, row_id, ns),
+    selectize = make_selectize_col_def(spec, annotations, row_id, ns),
     text_checkbox = make_text_checkbox_col_def(
       spec,
       annotations,

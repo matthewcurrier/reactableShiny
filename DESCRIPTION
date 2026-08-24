@@ -23,7 +23,6 @@ Imports:
     purrr,
     reactable,
     shiny
-RoxygenNote: 7.3.3
 Suggests: 
     testthat (>= 3.0.0),
     knitr,
@@ -39,3 +38,4 @@ VignetteBuilder: quarto
 Config/Needs/website: rmarkdown
 URL: https://github.com/matthewcurrier/reactable.shiny, https://matthewcurrier.github.io/reactableShiny/
 BugReports: https://github.com/matthewcurrier/reactableShiny/issues
+Config/roxygen2/version: 8.0.0

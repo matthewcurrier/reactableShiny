@@ -208,6 +208,29 @@ annotator_enriched_ui <- function(id) {
 #'     }, ignoreInit = TRUE)
 #'   }
 #'
+#' @param column_defs `list` or `NULL`. Named list of [reactable::colDef()]
+#'   objects, keyed by display column name, replacing the bare `colDef()` the
+#'   module generates for that column. This is the only supported way to set a
+#'   width, a cell `class`, or any other per-column option on a display
+#'   column: `columns` is owned by the module and cannot be smuggled in
+#'   through `reactable_options` (`do.call` would see two `columns`
+#'   arguments and error).
+#'
+#'   Only names appearing in `display_cols` are honoured — the `Select`,
+#'   `.selection`, and enrichment column definitions are the module's own and
+#'   are never overridable, so a caller cannot accidentally drop the checkbox
+#'   renderer or an enrichment input. Unknown names are ignored rather than
+#'   silently creating a phantom column. A `NULL` entry, or a display column
+#'   absent from the list, keeps the generated default.
+#'
+#'   Note that a `colDef()` supplied here *replaces* the generated one rather
+#'   than merging into it. The generated one is empty, so today that is a
+#'   distinction without a difference — but a `defaultColDef` passed via
+#'   `reactable_options` still applies underneath, as reactable merges it into
+#'   any column definition that leaves a field unset.
+#'
+#'   Defaults to `NULL` (every display column takes an empty `colDef()`).
+#'
 #' @param selection `character(1)`. Either `"multiple"` (default) or
 #'   `"single"`.
 #'
@@ -245,12 +268,29 @@ annotator_enriched_server <- function(
   reset_to = NULL,
   selection = "multiple",
   reactable_theme = theme_bare,
-  reactable_options = list()
+  reactable_options = list(),
+  column_defs = NULL
 ) {
   if (is.null(enrich_specs) || length(enrich_specs) == 0) {
     stop(
       "`enrich_specs` must be a non-empty list of enrichment column specifications."
     )
+  }
+
+  # Fail here rather than at render time. An unnamed list would silently
+  # match nothing and the caller would be left staring at an unchanged table
+  # with no error to explain it.
+  if (!is.null(column_defs)) {
+    if (!is.list(column_defs) || is.null(names(column_defs))) {
+      stop("`column_defs` must be a named list of reactable::colDef() objects.")
+    }
+    unknown <- setdiff(names(column_defs), display_cols)
+    if (length(unknown) > 0) {
+      stop(sprintf(
+        "`column_defs` names must appear in `display_cols`. Not found: %s.",
+        paste(unknown, collapse = ", ")
+      ))
+    }
   }
 
   shiny::moduleServer(id, function(input, output, session) {
@@ -535,8 +575,22 @@ annotator_enriched_server <- function(
       )
 
       # Column definitions
+      #
+      # Display columns get an empty colDef() unless the caller supplied one
+      # through `column_defs`. The lookup is by name, so it is indifferent to
+      # column order — which matters because reactable moves a grouped column
+      # to the front of the table, and a positional rule would size the wrong
+      # column whenever grouping is toggled.
+      #
+      # Scoped to display_cols deliberately: the Select checkbox renderer and
+      # the enrichment inputs are this module's contract with its own JS, and
+      # a caller overriding them would break the annotator, not customise it.
+      display_col_def <- function(name) {
+        column_defs[[name]] %||% reactable::colDef()
+      }
+
       display_col_defs <- purrr::set_names(
-        purrr::map(display_cols, ~ reactable::colDef()),
+        purrr::map(display_cols, display_col_def),
         display_cols
       )
 

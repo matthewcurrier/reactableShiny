@@ -1,0 +1,77 @@
+/* ==========================================================================
+   Selectize inside reactable cells
+   --------------------------------------------------------------------------
+   Selectize.js replaces the original <select> with its own DOM structure.
+
+   The JS initialiser sets dropdownParent: 'body', so the dropdown menu is
+   appended to <body> rather than inside the table cell. This avoids all
+   overflow-clipping issues with reactable's .rt-td / .rt-tbody containers.
+
+   Consequence for selectors:
+     - Input styling targets .rt-td .selectize-control (still inside cells)
+     - Dropdown styling targets bare .selectize-dropdown (child of <body>)
+   ========================================================================== */
+
+/* --- Input inside table cells ------------------------------------------- */
+.rt-td .selectize-control {
+  min-width: 140px;
+}
+
+.rt-td .selectize-control .selectize-input {
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 4px;
+  background-color: var(--bs-body-bg, #fff);
+}
+
+/* --- Focus state -------------------------------------------------------- */
+.rt-td .selectize-control .selectize-input.focus {
+  border-color: var(--bs-primary, #0d6efd);
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* --- Placeholder text --------------------------------------------------- */
+.rt-td .selectize-control .selectize-input .placeholder {
+  color: var(--bs-secondary, #6c757d);
+}
+
+/* --- Hide the dropdown caret -------------------------------------------- */
+.rt-td .selectize-control.single .selectize-input:after {
+  display: none;
+}
+
+/* --- Dropdown menu (appended to <body>) --------------------------------- */
+/* z-index must be high enough to sit above all table rows, modals, etc.   */
+.selectize-dropdown {
+  z-index: 99999 !important;
+  font-size: 0.875rem;
+  border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 4px;
+}
+
+.selectize-dropdown .option {
+  padding: 4px 8px;
+}
+
+.selectize-dropdown .active {
+  background-color: var(--bs-primary, #0d6efd);
+  color: #fff;
+}
+
+/* --- "Create" prompt ---------------------------------------------------- */
+.selectize-dropdown .create {
+  padding: 4px 8px;
+  color: var(--bs-secondary, #6c757d);
+  font-style: italic;
+}
+
+/* --- Gated (disabled) state --------------------------------------------- */
+/* When a selectize column is gated, the wrapping div gets opacity + pointer-
+   events from the inline style. This rule ensures the selectize dropdown
+   doesn't visually leak through the gated overlay. */
+[data-gated-by] .selectize-dropdown {
+  display: none;
+}

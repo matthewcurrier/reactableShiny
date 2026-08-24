@@ -9,19 +9,23 @@
 
 #' Annotator table — UI
 #'
-#' Returns the UI element for the annotator table module — a single
-#' [reactable::reactableOutput()] placeholder. Unlike [flexible_table_ui()],
-#' there are no add/reset buttons because rows are fixed to the source data
-#' frame.
+#' Returns the UI elements for the annotator table module: a
+#' [reactable::reactableOutput()] placeholder plus a JavaScript snippet
+#' that initialises selectize.js on any `"selectize"` columns after the
+#' table mounts. The script is idempotent — including multiple annotator
+#' tables on the same page does not duplicate event handlers.
 #'
 #' @param id `character(1)`. The Shiny module namespace ID. Must match the
 #'   `id` passed to [annotator_table_server()].
 #'
-#' @return A [reactable::reactableOutput()] UI element.
+#' @return A [shiny::tagList()] containing the reactable output and the
+#'   selectize initialiser script.
 #'
 #' @seealso [annotator_table_server()]
 #'
 #' @importFrom reactable reactableOutput
+#' @importFrom shiny NS tagList tags selectizeInput
+#' @importFrom htmltools findDependencies attachDependencies
 #'
 #' @examples
 #' \dontrun{
@@ -32,7 +36,148 @@
 #'
 #' @export
 annotator_table_ui <- function(id) {
-  reactableOutput(shiny::NS(id, "table"))
+  # Extract selectize.js dependency from Shiny's bundled selectizeInput.
+  # This ensures the selectize library (JS + CSS) is loaded on the page
+  # without rendering a visible input element.
+  selectize_deps <- findDependencies(
+    selectizeInput("__ann_dep__", label = NULL, choices = NULL)
+  )
+
+  ui <- tagList(
+    reactableOutput(shiny::NS(id, "table")),
+    tags$script(shiny::HTML(
+      "
+      (function() {
+        if (window._annSelectizeInitBound) return;
+        window._annSelectizeInitBound = true;
+
+        // Global store for pending async search callbacks
+        window._annSelectizePending = {};
+
+        // Register message handler immediately — Shiny JS is loaded
+        // synchronously in <head>, so it is available by the time
+        // inline body scripts execute.
+        function registerResultsHandler() {
+          if (window._annSelectizeHandlerReady) return;
+          if (typeof Shiny === 'undefined' || !Shiny.addCustomMessageHandler) {
+            console.warn('[selectize] Shiny not ready — retrying in 200ms');
+            setTimeout(registerResultsHandler, 200);
+            return;
+          }
+          window._annSelectizeHandlerReady = true;
+          console.log('[selectize] Registering message handler');
+          Shiny.addCustomMessageHandler(
+            'ann-selectize-results',
+            function(msg) {
+              console.log('[selectize] Received results for',
+                          msg.request_id, ':',
+                          msg.results ? msg.results.length : 0, 'items');
+              var cb = window._annSelectizePending[msg.request_id];
+              if (cb) {
+                cb(msg.results);
+                delete window._annSelectizePending[msg.request_id];
+              } else {
+                console.warn('[selectize] No pending callback for',
+                             msg.request_id);
+              }
+            }
+          );
+        }
+        registerResultsHandler();
+
+        function initAnnSelectize() {
+          var els = document.querySelectorAll(
+            'select.ann-selectize-create:not(.selectized)'
+          );
+          if (els.length === 0) return;
+          console.log('[selectize] Initialising',
+                      els.length, 'selectize inputs');
+
+          els.forEach(function(el) {
+            var inputId = el.id;
+            var placeholder =
+              el.getAttribute('data-placeholder') || 'Select or type...';
+            var isServerSearch =
+              el.getAttribute('data-server-search') === 'true';
+
+            console.log('[selectize]', inputId,
+                        '| server-search:', isServerSearch);
+
+            var config = {
+              create: true,
+              createOnBlur: true,
+              placeholder: placeholder,
+              onChange: function(value) {
+                Shiny.setInputValue(
+                  inputId, value || '', {priority: 'event'}
+                );
+              }
+            };
+
+            if (isServerSearch) {
+              var searchInputId =
+                el.getAttribute('data-search-input-id') || '';
+              var columnName =
+                el.getAttribute('data-column-name') || '';
+              var minChars =
+                parseInt(el.getAttribute('data-min-chars') || '2', 10);
+
+              console.log('[selectize]', inputId,
+                          '| searchInputId:', searchInputId,
+                          '| column:', columnName,
+                          '| minChars:', minChars);
+
+              config.valueField  = 'value';
+              config.labelField  = 'label';
+              config.searchField = ['label'];
+              config.loadThrottle = 300;
+
+              config.load = function(query, callback) {
+                if (query.length < minChars) return callback();
+                var requestId = inputId + '_' + Date.now();
+                console.log('[selectize] Searching:', query,
+                            '| requestId:', requestId);
+                window._annSelectizePending[requestId] = callback;
+                Shiny.setInputValue(searchInputId, {
+                  query: query,
+                  column: columnName,
+                  request_id: requestId
+                }, {priority: 'event'});
+              };
+            }
+
+            $(el).selectize(config);
+
+            // Move the dropdown to <body> so it escapes any
+            // overflow: hidden set by reactable on ancestor elements.
+            // Then override positionDropdown to use document-relative
+            // coordinates since the dropdown is now a child of <body>.
+            var ctrl = el.selectize;
+            if (ctrl && ctrl.$dropdown) {
+              ctrl.$dropdown.detach().appendTo(document.body);
+              ctrl.positionDropdown = function() {
+                var $c = this.$control;
+                var offset = $c.offset();
+                this.$dropdown.css({
+                  position : 'absolute',
+                  top      : offset.top + $c.outerHeight(true),
+                  left     : offset.left,
+                  width    : $c.outerWidth()
+                });
+              };
+            }
+          });
+        }
+
+        $(document).on('shiny:value', function() {
+          setTimeout(initAnnSelectize, 50);
+        });
+      })();
+    "
+    ))
+  )
+
+  attachDependencies(ui, selectize_deps, append = TRUE)
 }
 
 
@@ -70,6 +215,13 @@ annotator_table_ui <- function(id) {
 #'     \item{`"number"`}{Numeric input. Optionally accepts `min` and `max`.}
 #'     \item{`"radio"`}{Radio button group. Requires `choices`: a named
 #'       character vector.}
+#'     \item{`"selectize"`}{Searchable dropdown with free-create via
+#'       selectize.js. Requires `choices`: a named character vector. Do
+#'       **not** include a blank placeholder in `choices`; instead provide
+#'       an optional `placeholder` string (defaults to
+#'       `"Select or type..."`). User-created values are row-local — they
+#'       are not propagated to other rows and reset when `source_data`
+#'       changes.}
 #'   }
 #'   All types accept an optional `label` (defaults to `name`) and optional
 #'   `width` in pixels.
@@ -103,7 +255,10 @@ annotator_table_ui <- function(id) {
 #'   list(name = "category", type = "select",   label = "Category",
 #'        choices = c("Cheap" = "cheap", "Expensive" = "expensive")),
 #'   list(name = "approved",  type = "checkbox", label = "Approved?"),
-#'   list(name = "notes",     type = "text",     label = "Notes")
+#'   list(name = "notes",     type = "text",     label = "Notes"),
+#'   list(name = "tag",       type = "selectize", label = "Tag",
+#'        choices = c("Economy" = "economy", "Luxury" = "luxury"),
+#'        placeholder = "Pick or create...")
 #' )
 #'
 #' ui <- bslib::page_fluid(
@@ -234,6 +389,84 @@ annotator_table_server <- function(
       }
     })
 
+    # -------------------------------------------------------------------------
+    # Server-side search for selectize columns.
+    #
+    # When a selectize col_spec includes a `server_search` function, the JS
+    # initialiser configures an async `load` callback. Each keystroke (after
+    # the min_chars threshold) sends a search request here via
+    # Shiny.setInputValue('selectize_search', {query, column, request_id}).
+    #
+    # The observer calls the user-provided `server_search(query)` function,
+    # normalises the result to a list of list(value=, label=) records, and
+    # sends them back via session$sendCustomMessage('ann-selectize-results').
+    # The JS handler routes the response to the correct selectize instance
+    # by matching request_id.
+    # -------------------------------------------------------------------------
+
+    server_search_specs <- keep(input_specs, ~ !is.null(.x$server_search))
+
+    if (length(server_search_specs) > 0) {
+      message(
+        "[selectize] Server search enabled for columns: ",
+        paste(map_chr(server_search_specs, "name"), collapse = ", ")
+      )
+
+      observeEvent(input$selectize_search, {
+        req <- input$selectize_search
+        message(
+          "[selectize] Search request — column: ",
+          req$column,
+          " | query: '",
+          req$query,
+          "'",
+          " | request_id: ",
+          req$request_id
+        )
+
+        spec <- purrr::detect(
+          server_search_specs,
+          ~ .x$name == req$column
+        )
+        if (is.null(spec)) {
+          message("[selectize] No matching spec for column: ", req$column)
+          return()
+        }
+
+        raw <- spec$server_search(req$query)
+        message("[selectize] server_search returned ", nrow(raw), " rows")
+
+        # Normalise to a list of list(value, label) for JSON serialisation.
+        # Accepts either a data.frame with value + label columns or a named
+        # character vector (names = labels, values = values).
+        results <- if (is.data.frame(raw)) {
+          purrr::pmap(
+            raw[, c("value", "label"), drop = FALSE],
+            function(value, label, ...) list(value = value, label = label)
+          )
+        } else {
+          purrr::imap(raw, function(val, lab) {
+            list(value = val, label = lab)
+          }) |>
+            unname()
+        }
+
+        message(
+          "[selectize] Sending ",
+          length(results),
+          " results for request_id: ",
+          req$request_id
+        )
+        session$sendCustomMessage(
+          "ann-selectize-results",
+          list(
+            request_id = req$request_id,
+            results = results
+          )
+        )
+      })
+    }
+
     output$table <- renderReactable({
       force(reactable_remount_trigger())
 
@@ -263,12 +496,6 @@ annotator_table_server <- function(
         )
       )
     })
-
-    # bslib::navset_pill tab panes can prevent Shiny from detecting
-    # visibility changes on nested htmlwidget outputs. Force the render
-    # to fire regardless of container visibility so the table appears
-    # the moment its data is ready.
-    outputOptions(output, "table", suspendWhenHidden = FALSE)
 
     # -------------------------------------------------------------------------
     # Return value

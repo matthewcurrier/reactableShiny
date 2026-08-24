@@ -15,7 +15,8 @@ annotator_enriched_server(
   reset_to = NULL,
   selection = "multiple",
   reactable_theme = theme_bare,
-  reactable_options = list()
+  reactable_options = list(),
+  column_defs = NULL
 )
 }
 \arguments{
@@ -106,6 +107,29 @@ table. Defaults to `theme_bare`.}
 [reactable::reactable()] via [base::do.call()]. Do not include `data`,
 `selection`, `onClick`, `rowStyle`, `columns`, `defaultSelected`,
 `elementId`, or `theme` — these are owned by the module.}
+
+\item{column_defs}{`list` or `NULL`. Named list of [reactable::colDef()]
+  objects, keyed by display column name, replacing the bare `colDef()` the
+  module generates for that column. This is the only supported way to set a
+  width, a cell `class`, or any other per-column option on a display
+  column: `columns` is owned by the module and cannot be smuggled in
+  through `reactable_options` (`do.call` would see two `columns`
+  arguments and error).
+
+  Only names appearing in `display_cols` are honoured — the `Select`,
+  `.selection`, and enrichment column definitions are the module's own and
+  are never overridable, so a caller cannot accidentally drop the checkbox
+  renderer or an enrichment input. Unknown names are ignored rather than
+  silently creating a phantom column. A `NULL` entry, or a display column
+  absent from the list, keeps the generated default.
+
+  Note that a `colDef()` supplied here *replaces* the generated one rather
+  than merging into it. The generated one is empty, so today that is a
+  distinction without a difference — but a `defaultColDef` passed via
+  `reactable_options` still applies underneath, as reactable merges it into
+  any column definition that leaves a field unset.
+
+  Defaults to `NULL` (every display column takes an empty `colDef()`).}
 }
 \value{
 A [shiny::reactive()] returning a data frame with the `row_id`

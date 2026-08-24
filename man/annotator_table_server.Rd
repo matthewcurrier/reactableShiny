@@ -37,6 +37,13 @@ every column to show in the table. Each entry must have a `name` and
   \item{`"number"`}{Numeric input. Optionally accepts `min` and `max`.}
   \item{`"radio"`}{Radio button group. Requires `choices`: a named
     character vector.}
+  \item{`"selectize"`}{Searchable dropdown with free-create via
+    selectize.js. Requires `choices`: a named character vector. Do
+    **not** include a blank placeholder in `choices`; instead provide
+    an optional `placeholder` string (defaults to
+    `"Select or type..."`). User-created values are row-local — they
+    are not propagated to other rows and reset when `source_data`
+    changes.}
 }
 All types accept an optional `label` (defaults to `name`) and optional
 `width` in pixels.}
@@ -77,7 +84,10 @@ col_specs <- list(
   list(name = "category", type = "select",   label = "Category",
        choices = c("Cheap" = "cheap", "Expensive" = "expensive")),
   list(name = "approved",  type = "checkbox", label = "Approved?"),
-  list(name = "notes",     type = "text",     label = "Notes")
+  list(name = "notes",     type = "text",     label = "Notes"),
+  list(name = "tag",       type = "selectize", label = "Tag",
+       choices = c("Economy" = "economy", "Luxury" = "luxury"),
+       placeholder = "Pick or create...")
 )
 
 ui <- bslib::page_fluid(
