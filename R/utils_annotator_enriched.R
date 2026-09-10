@@ -182,6 +182,90 @@ gate_initial_style <- function(id_value, selected_ids_snap) {
 
 
 # -----------------------------------------------------------------------
+# Cell rendering
+#
+# WHY THESE BUILDERS RETURN A STRING AND SET html = TRUE.
+#
+# A colDef `cell` function that returns an htmltools tag hands reactable a tag
+# TREE, and reactable does not render it — it walks the tree at serialisation
+# time and converts every node into a React element, parsing each style
+# attribute as it goes. That cost is paid once per node, per cell, per render.
+#
+# A catalogue table makes that expensive fast. The developmental milestones
+# section is 157 rows x 3 select enrichments, each select carrying up to 13
+# <option> tags: ~10,000 nodes, which measured at 3.9 seconds of R and a 540 KB
+# widget payload every time the table re-rendered — and it re-renders on every
+# filter change, not just on open.
+#
+# Rendering to HTML here instead and declaring html = TRUE skips the conversion
+# entirely; reactable passes the string straight through. Same markup, one
+# order of magnitude less work.
+#
+# The second half is options_renderer(). Every row in a select column offers the
+# identical option list and differs only in which entry is `selected`, so the
+# <option> block is rendered once per distinct current value and reused. That is
+# what takes the milestones table from 3.9s to 0.6s; html = TRUE alone would
+# still re-render 157 identical option lists.
+# -----------------------------------------------------------------------
+
+#' Wrap one enrichment control in its gate and render it to HTML
+#'
+#' The gate is the div that greys out and disables an enrichment control while
+#' its row is unselected. Its initial style is baked in server-side (see
+#' [gate_initial_style()]); `data-row-id` is what the enrichmentGateSync handler
+#' looks the gate up by afterwards.
+#'
+#' @param id_value The row's unique identifier value.
+#' @param selected_ids_snap `character`. Frozen snapshot of selected row IDs.
+#' @param control A tag (or pre-rendered HTML) for the input itself.
+#'
+#' @return `character(1)`. HTML, for a colDef with `html = TRUE`.
+#'
+#' @noRd
+gated_cell_html <- function(id_value, selected_ids_snap, control) {
+  as.character(shiny::tags$div(
+    class = "enrichment-gate",
+    style = gate_initial_style(id_value, selected_ids_snap),
+    `data-row-id` = as.character(id_value),
+    onclick = "event.stopPropagation();",
+    control
+  ))
+}
+
+
+#' Build a memoised renderer for one select column's <option> list
+#'
+#' Returns a function of the row's current value that yields the rendered
+#' `<option>` block, computing each distinct value at most once. A column with
+#' four choices renders at most five distinct blocks no matter how many rows it
+#' has.
+#'
+#' @param choices Named character vector, as in a select spec's `choices`.
+#'
+#' @return `function(current)` returning [htmltools::HTML()].
+#'
+#' @noRd
+options_renderer <- function(choices) {
+  cache <- new.env(parent = emptyenv())
+
+  function(current) {
+    # "v." prefix: the placeholder's value is "", and an empty string is a
+    # zero-length variable name, which cannot key an environment.
+    key <- paste0("v.", current)
+    hit <- cache[[key]]
+    if (!is.null(hit)) {
+      return(hit)
+    }
+    rendered <- htmltools::HTML(as.character(
+      htmltools::tagList(make_options(choices, current))
+    ))
+    cache[[key]] <- rendered
+    rendered
+  }
+}
+
+
+# -----------------------------------------------------------------------
 # Column definition builders
 #
 # All builders follow the same pattern:
@@ -224,9 +308,12 @@ make_enriched_select_col_def <- function(
   ns,
   selected_ids_snap
 ) {
+  render_options <- options_renderer(spec$choices)
+
   reactable::colDef(
     name = spec$label %||% spec$name,
     width = spec$width,
+    html = TRUE,
     cell = function(value, index) {
       id_value <- enrich_snap[[row_id]][index]
       input_id <- ns(paste0(spec$name, "_", id_value))
@@ -235,11 +322,9 @@ make_enriched_select_col_def <- function(
       is_blank <- is.na(current) || !nzchar(current)
       current_for_options <- if (is.na(current)) "" else current
 
-      shiny::tags$div(
-        class = "enrichment-gate",
-        style = gate_initial_style(id_value, selected_ids_snap),
-        `data-row-id` = as.character(id_value),
-        onclick = "event.stopPropagation();",
+      gated_cell_html(
+        id_value,
+        selected_ids_snap,
         shiny::tags$select(
           id = input_id,
           class = "form-control form-control-sm",
@@ -249,7 +334,7 @@ make_enriched_select_col_def <- function(
              Shiny.setInputValue('%s', this.value, {priority: 'event'});",
             input_id
           ),
-          make_options(spec$choices, current_for_options)
+          render_options(current_for_options)
         )
       )
     }
@@ -279,16 +364,15 @@ make_enriched_text_col_def <- function(
   reactable::colDef(
     name = spec$label %||% spec$name,
     width = spec$width,
+    html = TRUE,
     cell = function(value, index) {
       id_value <- enrich_snap[[row_id]][index]
       input_id <- ns(paste0(spec$name, "_", id_value))
       current <- enrich_snap[[spec$name]][index]
 
-      shiny::tags$div(
-        class = "enrichment-gate",
-        style = gate_initial_style(id_value, selected_ids_snap),
-        `data-row-id` = as.character(id_value),
-        onclick = "event.stopPropagation();",
+      gated_cell_html(
+        id_value,
+        selected_ids_snap,
         shiny::tags$input(
           type = "text",
           id = input_id,
@@ -332,16 +416,15 @@ make_enriched_date_col_def <- function(
   reactable::colDef(
     name = spec$label %||% spec$name,
     width = spec$width,
+    html = TRUE,
     cell = function(value, index) {
       id_value <- enrich_snap[[row_id]][index]
       input_id <- ns(paste0(spec$name, "_", id_value))
       current <- enrich_snap[[spec$name]][index]
 
-      shiny::tags$div(
-        class = "enrichment-gate",
-        style = gate_initial_style(id_value, selected_ids_snap),
-        `data-row-id` = as.character(id_value),
-        onclick = "event.stopPropagation();",
+      gated_cell_html(
+        id_value,
+        selected_ids_snap,
         shiny::tags$input(
           type = "date",
           id = input_id,
@@ -382,16 +465,15 @@ make_enriched_number_col_def <- function(
   reactable::colDef(
     name = spec$label %||% spec$name,
     width = spec$width,
+    html = TRUE,
     cell = function(value, index) {
       id_value <- enrich_snap[[row_id]][index]
       input_id <- ns(paste0(spec$name, "_", id_value))
       current <- enrich_snap[[spec$name]][index]
 
-      shiny::tags$div(
-        class = "enrichment-gate",
-        style = gate_initial_style(id_value, selected_ids_snap),
-        `data-row-id` = as.character(id_value),
-        onclick = "event.stopPropagation();",
+      gated_cell_html(
+        id_value,
+        selected_ids_snap,
         shiny::tags$input(
           type = "number",
           id = input_id,
